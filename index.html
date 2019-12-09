@@ -3,21 +3,9 @@
 	<head>
 		<meta charset="utf-8">
 		<title>Ultimate Colour Picker</title>
+		<link rel="stylesheet" type="text/css" href="style.css">
 		<style>
-			body { margin: 0; }
-			canvas { 
-				width: 100%;
-				height: 100%; 
-				background-color: 0x777777;
-				display: block;
-				 }
-			#info {
-				position: absolute;
-				top: 10px;
-				left: 10px;
-				z-index: 100;
-				display:block;
-			}
+
 		</style>
 	</head>
 	<body>
@@ -28,7 +16,13 @@
 				<li>Left click and drag: move nodes</li>
 				<li>Q: toggle Perspective/Orthographic view</li>
 				<li>Y (hold): lock chromaticity</li>
+				<li>N: add new node</li>
 			</ul>				
+		</div>
+		<div id="panel">
+			<div id="panelcolours">
+
+			</div>
 		</div>
 		<script src="scripts/three.min.js"></script>
 		<script src="scripts/DragControls.js"></script>
@@ -36,7 +30,29 @@
 		  <script src="https://unpkg.com/three-spritetext"></script>
 		  <script src="https://cdnjs.cloudflare.com/ajax/libs/chroma-js/2.0.6/chroma.min.js"></script>
 		  <script src="https://cdn.jsdelivr.net/npm/everpolate@0.0.3/everpolate.browserified.min.js"></script>
+		  <script src="scripts/ntc.js"></script>
 		<script>
+
+			var nodeInspectorTemplate = document.createElement("div");
+			nodeInspectorTemplate.className = "nodeinspector";
+
+
+			var nodeInspectorSquare = document.createElement("div");
+			nodeInspectorSquare.className = "inspectorcoloursquare";
+			nodeInspectorTemplate.appendChild(nodeInspectorSquare);
+
+			var nodeInspectorRight = document.createElement("div");
+			nodeInspectorRight.className = "inspectorcolourright";
+			nodeInspectorTemplate.appendChild(nodeInspectorRight);
+
+			var nodeInspectorName = document.createElement("div");
+			nodeInspectorName.className = "inspectorcolourname";
+			nodeInspectorRight.appendChild(nodeInspectorName);
+
+			var nodeInspectorInfo = document.createElement("div");
+			nodeInspectorInfo.className = "inspectorcolourinfo";
+			nodeInspectorRight.appendChild(nodeInspectorInfo);
+
 
 			const frustumSize = 2;
 
@@ -51,30 +67,6 @@
  			function Ftoh(F){
  				return linearinterp(F,Fvals,fletch_h);
  			}
-
-
-		// 	function Ftoh(F){
-		// 		var x = F;
-		// 		var x2 = x*x;
-		// 		var x3 = x2*x;
-		// 		var x4 = x2*x2;
-		// 		var x5 = x3*x2;
-		// 		var x6 = x3*x3;
-		// 		var x7 = x4*x3;
-		// 		var x8 = x4*x4;
-		// 		var x9 = x4*x5;
-		// 		var x10 = x5*x5;
-		// 		var x11 = x6*x5;
-		// 		var x12 = x6*x6;
-
-		// 		return 42.706289650144086 + 23.31948609111196*x - 4.347001410730493*x2 - 5.1800356634214735*x3 + 
-  // 5.461498806728809*x4 - 0.6682312661786106*x5 - 0.8011069685582926*x6 + 
-  // 0.3938893083859659*x7 - 0.08363768194215351*x8 + 0.009869044727450706*x9 - 
-  // 0.0006713233180432839*x10 + 0.00002469251321497895*x11 - 3.8117478815461154e-7*x12;
-		// 	}
-
-
-
 
 
 
@@ -224,11 +216,28 @@
 
 					scene.add(this.box);
 
+
+					this.inspectorDiv = nodeInspectorTemplate.cloneNode(true);
+					this.squareDiv = this.inspectorDiv.querySelector(".inspectorcoloursquare");
+					this.nameDiv = this.inspectorDiv.querySelector(".inspectorcolourname");
+					this.infoDiv = this.inspectorDiv.querySelector(".inspectorcolourinfo");
+
+
 					this.Lincreased = false;
 					this.update();
+
+					
+					document.getElementById("panelcolours").appendChild(this.inspectorDiv);
 				};
 
 				onColourUpdated(){
+					if(typeof this.inspectorDiv != "undefined"){
+					var hex = this.rgb.hex();
+					this.squareDiv.style.background = hex;
+
+					this.nameDiv.innerHTML = ntc.name(hex)[1];
+					this.infoDiv.innerHTML = hex;
+				}
 				};
 
 				updateFromPosition(){
@@ -337,7 +346,12 @@
 			var gnode = new WhitePointNode(50,0,0);
 			nodes.push(gnode.box);
 
-			for(var i =0;i<40; i++){
+			// for(var i =0;i<40; i++){
+			// 	var newnode = new Node(Math.random()*100,Math.random()*200-100,Math.random()*200-100);
+			// 	nodes.push(newnode.box);
+			// }
+
+			function addNewNode(){
 				var newnode = new Node(Math.random()*100,Math.random()*200-100,Math.random()*200-100);
 				nodes.push(newnode.box);
 			}
@@ -388,6 +402,9 @@
                  };
                  if (event.key == "y") {
                  	lockChromaticity = true;
+                 };
+                 if (event.key == "n") {
+                 	addNewNode();
                  };
             };
             function onDocumentKeyUp(event) { 
