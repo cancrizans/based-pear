@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title>Ultimate Colour Picker</title>
+		<style>
+			body { margin: 0; }
+			canvas { 
+				width: 100%;
+				height: 100%; 
+				background-color: 0x777777;
+				display: block;
+				 }
+			#info {
+				position: absolute;
+				top: 10px;
+				left: 10px;
+				z-index: 100;
+				display:block;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="info">
+			<ul>
+				<li>Right click and drag: rotate camera</li>
+				<li>Mouse wheel: zoom</li>
+				<li>Left click and drag: move nodes</li>
+				<li>Q: toggle Perspective/Orthographic view</li>
+				<li>Y (hold): lock chromaticity</li>
+			</ul>				
+		</div>
+		<script src="scripts/three.min.js"></script>
+		<script src="scripts/DragControls.js"></script>
+		<script src="scripts/OrbitControls.js"></script>
+		  <script src="https://unpkg.com/three-spritetext"></script>
+		  <script src="https://cdnjs.cloudflare.com/ajax/libs/chroma-js/2.0.6/chroma.min.js"></script>
+		  <script src="https://cdn.jsdelivr.net/npm/everpolate@0.0.3/everpolate.browserified.min.js"></script>
+		<script>
+
+			const frustumSize = 2;
+
+			const toneCodes = ["RO","O","OY","Y","YG","G","BG","B","BV","V","VR","R"];
+
+			const fletch_h = [19, 37, 45, 63, 83, 102, 122, 137, 170, 263, 302, 331, 19 + 360, 
+ 37 + 360, 45 + 360, 63 + 360];
+ 			const Fvals = [-2,-1,0,1,2,3,4,5,6,7,8,9,10,11,12,13];
+
+ 			var linearinterp = everpolate.linear;
+
+ 			function Ftoh(F){
+ 				return linearinterp(F,Fvals,fletch_h);
+ 			}
+
+
+		// 	function Ftoh(F){
+		// 		var x = F;
+		// 		var x2 = x*x;
+		// 		var x3 = x2*x;
+		// 		var x4 = x2*x2;
+		// 		var x5 = x3*x2;
+		// 		var x6 = x3*x3;
+		// 		var x7 = x4*x3;
+		// 		var x8 = x4*x4;
+		// 		var x9 = x4*x5;
+		// 		var x10 = x5*x5;
+		// 		var x11 = x6*x5;
+		// 		var x12 = x6*x6;
+
+		// 		return 42.706289650144086 + 23.31948609111196*x - 4.347001410730493*x2 - 5.1800356634214735*x3 + 
+  // 5.461498806728809*x4 - 0.6682312661786106*x5 - 0.8011069685582926*x6 + 
+  // 0.3938893083859659*x7 - 0.08363768194215351*x8 + 0.009869044727450706*x9 - 
+  // 0.0006713233180432839*x10 + 0.00002469251321497895*x11 - 3.8117478815461154e-7*x12;
+		// 	}
+
+
+
+
+
+
+			var lockChromaticity = false;
+
+
+			var scene = new THREE.Scene();
+
+			scene.background = new THREE.Color(.5,.5,.5);
+
+
+			var camera;
+            var cameraPerspective = true;
+
+            var dragControls;
+
+            function setupCamera(){
+            	var campos = new THREE.Vector3();
+            	if(typeof camera != "undefined"){
+            	campos = camera.position.clone();
+            	};
+
+            	if(cameraPerspective){
+            		camera = new THREE.PerspectiveCamera( 75, window.innerWidth/window.innerHeight, 0.1, 100 );
+					camera.up = new THREE.Vector3(0,0,1);
+
+
+
+            	}
+            	else{
+            		
+            		var aspect = window.innerWidth/window.innerHeight;
+            		camera = new THREE.OrthographicCamera( frustumSize * aspect / - 2,  frustumSize * aspect / 2, frustumSize / 2, frustumSize / - 2, 0.1, 100 );
+            		camera.up = new THREE.Vector3(0,0,1);
+
+            	}
+
+            	camera.position.copy(campos);
+				camera.lookAt(new THREE.Vector3());
+            	camera.updateProjectionMatrix();
+            		
+            }
+
+            setupCamera();
+
+            function switchCameraMode(){
+            	cameraPerspective = !cameraPerspective;
+            	setupCamera();
+            	updateCamera();
+            	orbitControls.object = camera;
+            	orbitControls.update();
+            	CreateDragControls();
+            }
+			
+			var renderer = new THREE.WebGLRenderer();
+			renderer.setSize( window.innerWidth, window.innerHeight );
+			document.body.appendChild( renderer.domElement );
+
+            function updateCamera(){
+            	renderer.setSize( window.innerWidth, window.innerHeight );
+            	var aspect = window.innerWidth / window.innerHeight;
+            	if(cameraPerspective){
+            		camera.aspect = aspect;
+					camera.up = new THREE.Vector3(0,0,1);
+					camera.lookAt(new THREE.Vector3());
+
+            	}
+            	else
+            	{
+
+            		camera.left = frustumSize * aspect / - 2;
+            		camera.right = frustumSize  *aspect/ 2;
+            		camera.top = frustumSize  / 2;
+            		camera.bottom = - frustumSize / 2;
+            		camera.aspect = aspect;
+            	
+            		
+            	}
+            	camera.updateProjectionMatrix();
+            	if(typeof orbitControls != "undefined")
+            		orbitControls.update();
+            	if(typeof dragControls != "undefined")
+            		dragControls.camera = camera;
+            	
+            }
+
+
+
+            // window.addEventListener('resize', onWindowResize, false);
+            function onWindowResize(){
+
+            	updateCamera();
+            }
+
+			
+
+			var gridMaterial = new THREE.LineBasicMaterial( {color: 0xffffffff});
+
+
+			var geometryAxes = new THREE.Geometry();
+
+			var k;
+			for (k=0; k<12; k++)
+			{
+				var theta = -2* Math.PI * k / 12.0;
+				geometryAxes.vertices.push(new THREE.Vector3(-Math.cos(theta),-Math.sin(theta),0));
+				geometryAxes.vertices.push(new THREE.Vector3(Math.cos(theta),Math.sin(theta),0));
+
+			var clabel = new SpriteText(toneCodes[k],0.03)
+			clabel.color ='white'
+			clabel.position.set(Math.cos(theta),Math.sin(theta),0);
+			clabel.position.multiplyScalar(1.1);
+			clabel.material.sizeAttenuation=false;
+			scene.add(clabel);
+			}
+			var Axes = new THREE.LineSegments(geometryAxes, gridMaterial);
+
+			scene.add(Axes);
+
+
+			function Node(L,x,y){
+				this.L = L;
+				this.x = x;
+				this.y = y;
+
+				this.size = 0.07;
+
+				this.boxGeometry = new THREE.BoxGeometry(this.size,this.size,this.size);
+				this.boxMaterial = new THREE.MeshBasicMaterial( 
+					{ color: 0xffffff});
+				this.box = new THREE.Mesh(this.boxGeometry,this.boxMaterial);
+
+				this.box.daddy = this;
+
+				scene.add(this.box);
+				
+				this.Lincreased = false;
+
+				this.updateFromPosition = function(){
+					var oldL = this.L
+
+					var position = this.box.position;
+					if (!lockChromaticity){
+						this.x = 100*position.x;
+						this.y = 100*position.y;
+					};
+					this.L = 50*(position.z+1);
+
+					this.Lincreased = this.L > oldL;
+					
+					this.update();
+				}
+
+				this.update = function(){
+
+					var position = new THREE.Vector3(this.x/100.,this.y/100.,this.L/50.-1);
+
+					var angle = (-Math.atan2(this.y,this.x)+2*Math.PI)%(2*Math.PI);
+					var F = angle /(2*Math.PI) * 12;
+
+					var C = Math.sqrt(this.y*this.y +  this.x*this.x);
+					var h = Ftoh(F);
+
+
+					this.rgb = chroma.lch(this.L,C,h);
+
+
+					if(this.rgb.clipped()){
+						if(lockChromaticity){
+							if(this.Lincreased){
+								this.L = this.L - 0.005;
+							}
+							else
+							{
+								this.L = this.L + 0.005;
+							}
+
+							this.update();
+							return;
+
+						}
+					}
+
+					if(this.L<0 || this.L>100){
+
+						this.L = Math.max(0,Math.min(99.999,this.L));
+						this.x = 0;
+						this.y = 0;
+						this.update();
+						return;
+					}
+
+					if(this.rgb.clipped()){
+
+						// if(this.L<0.001 || this.L > 99.99){
+						// 	this.x = 0;
+						// 	this.y = 0;
+						// 	this.update();
+						// 	return;
+						// }
+
+
+
+
+						var factor = .99;
+						this.x*=factor;
+						this.y*=factor;
+						this.update();
+						return;
+					}
+
+					//this.color = new THREE.Color(this.L,this.L,this.L);
+
+					this.box.material.color.set(this.rgb.hex());
+					this.box.position.copy(position);
+				}
+
+				this.update();
+				
+			}
+
+
+			var nodes = [];
+
+			for(var i =0;i<40; i++){
+				var newnode = new Node(Math.random()*100,Math.random()*200-100,Math.random()*200-100);
+				nodes.push(newnode.box);
+			}
+
+
+
+
+				var orbitControls = new THREE.OrbitControls(camera,renderer.domElement);
+				orbitControls.enablePan = false;
+				orbitControls.enableZoom = true;
+				orbitControls.enableDamping = true;
+				orbitControls.mouseButtons = {
+					RIGHT: THREE.MOUSE.ROTATE,
+					LEFT: THREE.MOUSE.PAN,
+					MIDDLE: THREE.MOUSE.DOLLY
+				}
+				camera.position.set(2,0,0);
+				camera.lookAt(new THREE.Vector3);
+				orbitControls.update();
+
+			function CreateDragControls() {
+				if(typeof dragControls != "undefined"){
+					dragControls.dispose();
+				}
+				dragControls = new THREE.DragControls( nodes, camera, renderer.domElement);
+
+				dragControls.addEventListener( 'drag', function ( event ) {
+				 		event.object.daddy.updateFromPosition();
+				 	} );
+
+				dragControls.addEventListener( 'dragstart', function ( event ) {
+				 		orbitControls.enabled = false;
+				 	} );
+				dragControls.addEventListener( 'dragend', function ( event ) {
+						event.object.daddy.updateFromPosition();
+				 		orbitControls.enabled = true;
+				 	} );
+			};
+
+			CreateDragControls();
+
+
+			document.addEventListener("keydown", onDocumentKeyDown, false);
+			document.addEventListener("keyup", onDocumentKeyUp, false);
+            function onDocumentKeyDown(event) { 
+                 if (event.key == "q") {
+                     switchCameraMode();     
+                 };
+                 if (event.key == "y") {
+                 	lockChromaticity = true;
+                 };
+            };
+            function onDocumentKeyUp(event) { 
+                 if (event.key == "y") {
+                 	lockChromaticity = false;
+                 };
+            };
+
+
+
+
+			// var updateCamera = function() {
+			// 	camera.position.set(Math.cos(azimuth)*Math.cos(altitude),Math.sin(azimuth)*Math.cos(altitude),Math.sin(altitude));
+			// 	camera.position.multiplyScalar(2);
+			// 	camera.lookAt(new THREE.Vector3());
+			// 	camera.updateMatrix();
+			// }
+
+			var animate = function () {
+				requestAnimationFrame( animate );
+
+				// cube.rotation.x += 0.01;
+				// cube.rotation.y += 0.01;
+
+				orbitControls.update();
+
+				renderer.render( scene, camera );
+
+			};
+
+			animate();
+		</script>
+	</body>
+</html>
