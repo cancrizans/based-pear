@@ -107,7 +107,7 @@
             	else{
             		
             		var aspect = window.innerWidth/window.innerHeight;
-            		camera = new THREE.OrthographicCamera( frustumSize * aspect / - 2,  frustumSize * aspect / 2, frustumSize / 2, frustumSize / - 2, 0.1, 100 );
+            		camera = new THREE.OrthographicCamera( frustumSize * aspect / - 2,  frustumSize * aspect / 2, frustumSize / 2, frustumSize / - 2, 0.001, 100 );
             		camera.up = new THREE.Vector3(0,0,1);
 
             	}
@@ -171,6 +171,9 @@
 
 			
 
+			var whitePointGrid = new THREE.Object3D();
+			whitePointGrid.position.set(0,0,0);
+
 			var gridMaterial = new THREE.LineBasicMaterial( {color: 0xffffffff});
 
 
@@ -183,37 +186,52 @@
 				geometryAxes.vertices.push(new THREE.Vector3(-Math.cos(theta),-Math.sin(theta),0));
 				geometryAxes.vertices.push(new THREE.Vector3(Math.cos(theta),Math.sin(theta),0));
 
-			var clabel = new SpriteText(toneCodes[k],0.03)
-			clabel.color ='white'
-			clabel.position.set(Math.cos(theta),Math.sin(theta),0);
-			clabel.position.multiplyScalar(1.1);
-			clabel.material.sizeAttenuation=false;
-			scene.add(clabel);
+				var clabel = new SpriteText(toneCodes[k],0.03);
+				clabel.color ='white';
+				clabel.position.set(Math.cos(theta),Math.sin(theta),0);
+				clabel.position.multiplyScalar(1.1);
+				clabel.material.sizeAttenuation=false;
+				whitePointGrid.add(clabel);
 			}
+
+			var nlabel = new SpriteText("N",0.03);
+			nlabel.color = "white";
+			nlabel.position.set(0,0,0);
+			nlabel.material.sizeAttenuation = false;
+			scene.add(nlabel);
+
 			var Axes = new THREE.LineSegments(geometryAxes, gridMaterial);
 
-			scene.add(Axes);
+			whitePointGrid.add(Axes);
+
+			scene.add(whitePointGrid);
 
 
-			function Node(L,x,y){
-				this.L = L;
-				this.x = x;
-				this.y = y;
+			class Node{
+				constructor(L,x,y){
+					this.L = L;
+					this.x = x;
+					this.y = y;
 
-				this.size = 0.07;
+					this.size = 0.07;
 
-				this.boxGeometry = new THREE.BoxGeometry(this.size,this.size,this.size);
-				this.boxMaterial = new THREE.MeshBasicMaterial( 
-					{ color: 0xffffff});
-				this.box = new THREE.Mesh(this.boxGeometry,this.boxMaterial);
+					this.boxGeometry = new THREE.BoxGeometry(this.size,this.size,this.size);
+					this.boxMaterial = new THREE.MeshBasicMaterial( 
+						{ color: 0xffffff});
+					this.box = new THREE.Mesh(this.boxGeometry,this.boxMaterial);
 
-				this.box.daddy = this;
+					this.box.daddy = this;
 
-				scene.add(this.box);
-				
-				this.Lincreased = false;
+					scene.add(this.box);
 
-				this.updateFromPosition = function(){
+					this.Lincreased = false;
+					this.update();
+				};
+
+				onColourUpdated(){
+				};
+
+				updateFromPosition(){
 					var oldL = this.L
 
 					var position = this.box.position;
@@ -228,7 +246,7 @@
 					this.update();
 				}
 
-				this.update = function(){
+				update(){
 
 					var position = new THREE.Vector3(this.x/100.,this.y/100.,this.L/50.-1);
 
@@ -269,16 +287,6 @@
 
 					if(this.rgb.clipped()){
 
-						// if(this.L<0.001 || this.L > 99.99){
-						// 	this.x = 0;
-						// 	this.y = 0;
-						// 	this.update();
-						// 	return;
-						// }
-
-
-
-
 						var factor = .99;
 						this.x*=factor;
 						this.y*=factor;
@@ -290,14 +298,44 @@
 
 					this.box.material.color.set(this.rgb.hex());
 					this.box.position.copy(position);
+
+					this.box.updateMatrixWorld();
+
+					this.onColourUpdated();
 				}
 
-				this.update();
+
 				
 			}
 
+			class WhitePointNode extends Node{
+				constructor(L,x,y){
+					super(L,x,y);
+					var osize = this.size * 1.1;
+					var outlineMaterial = new THREE.MeshBasicMaterial( 
+						{ color: 0x000000, side: THREE.BackSide});
+					var outlineGeometry = new THREE.BoxGeometry(osize,osize,osize);
+					this.outline = new THREE.Mesh(outlineGeometry,outlineMaterial);
+					scene.add(this.outline);
+				}
+
+				onColourUpdated() {
+					super.onColourUpdated();
+					scene.background = this.box.material.color.clone();
+					whitePointGrid.position.set(this.box.position.x,this.box.position.y,0);
+					if(typeof this.outline != "undefined"){
+						this.outline.position.copy(this.box.position);
+
+					}
+				}
+			}
+
+
 
 			var nodes = [];
+
+			var gnode = new WhitePointNode(50,0,0);
+			nodes.push(gnode.box);
 
 			for(var i =0;i<40; i++){
 				var newnode = new Node(Math.random()*100,Math.random()*200-100,Math.random()*200-100);
