@@ -34,6 +34,20 @@
 					</div>
 				</template>
 			</div>
+			<div id="panelramps">
+				<template id="rampinspectortemplate">
+					<div class="rampinspector">
+						<div class="inspectorramprect">
+						</div>
+						<div class="slidercontainer">
+  							<input type="range" min="-0.5" max="1" value="0" step="0.005" class="lambdaslider">
+						</div>
+						<div class="slidercontainer">
+  							<input type="range" min="-1" max="1" value="0" step="0.005" class="muslider">
+						</div>
+					</div>
+				</template>
+			</div>
 		</div>
 		<script src="scripts/three.min.js"></script>
 		<script src="scripts/DragControls.js"></script>
@@ -51,6 +65,7 @@
 		<script>
 
 			var nodeInspectorTemplate = document.querySelector("#nodeinspectortemplate");
+			var rampInspectorTemplate = document.querySelector("#rampinspectortemplate");
 
 
 			const frustumSize = 2;
@@ -464,11 +479,10 @@
 					this.n1 = n1;
 					this.n2 = n2;
 
-					this.n1.onColourUpdatedListeners.push(this);
-					this.n2.onColourUpdatedListeners.push(this);
+
 
 					this.geometry = new THREE.LineGeometry();
-					this.N = 10;
+					this.N = 12;
 					var positions = new Float32Array(this.N * 3);
 					this.geometry.setPositions(positions);
 					var colours = new Float32Array(this.N * 3);
@@ -478,12 +492,31 @@
 					this.line.computeLineDistances();
 					scene.add(this.line);
 
+					this.lambda = 0;
+					this.mu = 0;
+
+					this.inspectorDiv = rampInspectorTemplate.content.cloneNode(true);
+
+					this.lambdaSlider = this.inspectorDiv.querySelector(".lambdaslider");
+					this.muSlider = this.inspectorDiv.querySelector(".muslider");
+					this.rectDiv = this.inspectorDiv.querySelector(".inspectorramprect");
+					this.inspectorDiv = document.getElementById("panelramps").appendChild(this.inspectorDiv);
+
+
+					this.n1.onColourUpdatedListeners.push(this);
+					this.n2.onColourUpdatedListeners.push(this);
+
+					this.lambdaSlider.addEventListener("input",this.update.bind(this));
+					this.muSlider.addEventListener("input",this.update.bind(this));
+					//this.lambdaSlider.addEventListener("onchange",this.update.bind(this));
+
+
 					this.update();
 				}
 
-				getxyL(t){
+				getxyL(t,tL){
 					var out = {};
-					out.L = this.n2.L * t +  this.n1.L * (1-t);
+					out.L = this.n2.L * tL +  this.n1.L * (1-tL);
 					out.x = this.n2.x * t +  this.n1.x * (1-t);
 					out.y = this.n2.y * t +  this.n1.y * (1-t);
 					return out;
@@ -492,23 +525,48 @@
 
 
 				update() {
+					this.lambda = this.lambdaSlider.value;
+					this.mu = this.muSlider.value;
+					var maxblowup = Math.exp(-this.lambda);
+
+					var midxyL = this.getxyL(0.5,0.5);
+
 					var positions = [];
 					var colours = [];
+					var hexes = [];
 					for(var k=0;k<this.N;k++){
 						var t = 1.0 / (this.N-1) * k;
-						var xyL = this.getxyL(t);
-						var pos = xyLtopos(xyL.x,xyL.y,xyL.L);
-						var FC = xytoFC(xyL.x,xyL.y);
-						var col = FCLtoRGB(FC.F,FC.C,xyL.L).gl();
 
+						var t2 = 4*(t-t*t);
+						var blowup = (1-t2)+t2*maxblowup;
+
+						var tL = t - this.mu * (t*t-t);
+
+						var xyLraw = this.getxyL(t,tL);
+
+						var x = xyLraw.x - this.lambda * midxyL.x * t2;
+						var y = xyLraw.y - this.lambda * midxyL.y * t2;
+						var L = xyLraw.L;
+
+						var pos = xyLtopos(x,y,L);
+
+						var FC = xytoFC(x,y);
+						var col = FCLtoRGB(FC.F,FC.C,L);
+						var gl = col.gl();
+
+						if(col.clipped())
+							gl = [0,0,0];
 						
 
 						positions.push(pos.x,pos.y,pos.z);
-						colours.push(col[0],col[1],col[2]);
+						colours.push(gl[0],gl[1],gl[2]);
+						hexes.push(col.hex());
+
 					}
 					
 					this.line.geometry.setPositions(positions);
 					this.line.geometry.setColors(colours);
+					this.rectDiv.style.backgroundImage = "linear-gradient(to right,"+ hexes.join(',') + ")";
 				}
 
 				onColourUpdated(){
