@@ -34,3 +34,5 @@ With the `N` key you add a node.
 You can then drag nodes around to change the colour. The colour will always be forced to stay within gamut, but it will try to keep as big a chrominance as possible.
 
 By holding the `Y` key while dragging, you can lock a node's chromaticity and change only the luminance, i.e. only move it vertically.
+
+With the little x in the top right of a node's entry in the inspector you can delete a node. You cannot delete the first node, which is the neutral point / background.
