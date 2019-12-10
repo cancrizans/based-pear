@@ -38,6 +38,12 @@
 		<script src="scripts/three.min.js"></script>
 		<script src="scripts/DragControls.js"></script>
 		<script src="scripts/OrbitControls.js"></script>
+			<script src="scripts/LineMaterial.js"></script>
+			<script src="scripts/LineSegments2.js"></script>
+			<script src="scripts/LineSegmentsGeometry.js"></script>
+			<script src="scripts/LineGeometry.js"></script>
+			<script src="scripts/Line2.js"></script>
+			
 		  <script src="https://unpkg.com/three-spritetext"></script>
 		  <script src="https://cdnjs.cloudflare.com/ajax/libs/chroma-js/2.0.6/chroma.min.js"></script>
 		  <script src="https://cdn.jsdelivr.net/npm/everpolate@0.0.3/everpolate.browserified.min.js"></script>
@@ -192,6 +198,16 @@
 			scene.add(whitePointGrid);
 
 
+			function xytoFC(x,y){
+				var angle = (-Math.atan2(y,x)+2*Math.PI)%(2*Math.PI);
+				var out = {};
+				out.F = angle /(2*Math.PI) * 12;
+
+				out.C = Math.sqrt(y*y +  x*x);
+				
+				return out;
+			}
+
 			function FCLtoRGB(F,C,L) {
 				h = Ftoh(F);
 				return chroma.lch(L,C,h)
@@ -216,11 +232,11 @@
 					this.x = x;
 					this.y = y;
 
-					
+					this.onColourUpdatedListeners = [];
 				};
 
 				onColourUpdated(){
-
+					this.onColourUpdatedListeners.forEach( lisner => lisner.onColourUpdated() );
 				};
 
 
@@ -229,10 +245,10 @@
 					//this.position = new THREE.Vector3(this.x/100.,this.y/100.,this.L/50.-1);
 					this.position = xyLtopos(this.x,this.y,this.L);
 
-					var angle = (-Math.atan2(this.y,this.x)+2*Math.PI)%(2*Math.PI);
-					this.F = angle /(2*Math.PI) * 12;
-
-					this.C = Math.sqrt(this.y*this.y +  this.x*this.x);
+					var FC = xytoFC(this.x,this.y)
+					this.F = FC.F;
+					this.C = FC.C;
+					
 
 					this.rgb = FCLtoRGB(this.F,this.C,this.L);		
 
@@ -292,72 +308,6 @@
 
 				}
 
-				destroy(){
-
-				}
-
-
-				
-			}
-
-
-			class DraggableNode extends Node{
-				constructor(L,x,y){
-					super(L,x,y);
-					this.size = 0.07;
-
-					this.boxGeometry = new THREE.BoxGeometry(this.size,this.size,this.size);
-					this.boxMaterial = new THREE.MeshBasicMaterial( 
-						{ color: 0xffffff});
-					this.box = new THREE.Mesh(this.boxGeometry,this.boxMaterial);
-
-					this.box.daddy = this;
-
-					scene.add(this.box);
-
-
-					this.inspectorDiv = nodeInspectorTemplate.content.cloneNode(true);
-
-					this.topDiv = this.inspectorDiv.querySelector(".nodeinspector");
-					this.squareDiv = this.inspectorDiv.querySelector(".inspectorcoloursquare");
-					this.nameDiv = this.inspectorDiv.querySelector(".inspectorcolourname");
-					this.infoDiv = this.inspectorDiv.querySelector(".inspectorcolourinfo");
-					this.deleteA = this.inspectorDiv.querySelector("a");
-					var thisnode = this;
-					
-					
-					this.Lincreased = false;
-					this.update();
-
-					
-					this.inspectorDiv = document.getElementById("panelcolours").appendChild(this.inspectorDiv);
-
-					this.deleteA.addEventListener("click",this.onClickDelete.bind(this));
-				}
-
-				onClickDelete(){
-					
-					this.kill();
-				}
-
-				kill(){
-					scene.remove(this.box);
-					nodes.splice(nodes.indexOf(this.box),1);
-					this.topDiv.remove();
-				}
-
-				update(){
-					super.update();
-
-					this.box.material.color.set(this.rgb.hex());
-					this.box.position.copy(this.position);
-
-					this.box.updateMatrixWorld();
-
-					this.onColourUpdated();
-
-				}
-
 				stringFCL(){
 					var befcol = toneCodes[Math.floor(this.F)];
 					var aftcol = toneCodes[Math.floor(this.F+1)%12];
@@ -378,6 +328,76 @@
 					return `L=${this.L.toFixed(1)}, C=${this.C.toFixed(1)}, F=${this.F.toFixed(2)} (${cname})`
 				}
 
+				kill(){
+					this.onColourUpdatedListeners.forEach(lisner => lisner.kill());
+				}
+
+
+				
+			}
+
+
+			var draggableNodes = [];
+
+			class DraggableNode extends Node{
+				constructor(L,x,y){
+					super(L,x,y);
+					this.size = 0.07;
+
+					this.boxGeometry = new THREE.BoxGeometry(this.size,this.size,this.size);
+					this.boxMaterial = new THREE.MeshBasicMaterial( 
+						{ color: 0xffffff});
+					this.box = new THREE.Mesh(this.boxGeometry,this.boxMaterial);
+
+					this.box.daddy = this;
+
+					scene.add(this.box);
+					draggableNodes.push(this.box);
+
+
+					this.inspectorDiv = nodeInspectorTemplate.content.cloneNode(true);
+
+					this.topDiv = this.inspectorDiv.querySelector(".nodeinspector");
+					this.squareDiv = this.inspectorDiv.querySelector(".inspectorcoloursquare");
+					this.nameDiv = this.inspectorDiv.querySelector(".inspectorcolourname");
+					this.infoDiv = this.inspectorDiv.querySelector(".inspectorcolourinfo");
+					this.deleteA = this.inspectorDiv.querySelector("a");
+					var thisnode = this;
+					
+					
+					this.Lincreased = false;
+					this.update();
+
+					
+					this.inspectorDiv = document.getElementById("panelcolours").appendChild(this.inspectorDiv);
+
+					this.deleteA.addEventListener("click",this.onClickDelete.bind(this));
+
+				}
+
+				onClickDelete(){
+					
+					this.kill();
+				}
+
+				kill(){
+					super.kill();
+					scene.remove(this.box);
+					draggableNodes.splice(nodes.indexOf(this.box),1);
+					this.topDiv.remove();
+				}
+
+				update(){
+					super.update();
+
+					this.box.material.color.set(this.rgb.hex());
+					this.box.position.copy(this.position);
+
+					this.box.updateMatrixWorld();
+
+					this.onColourUpdated();
+
+				}
 				onColourUpdated(){
 					super.onColourUpdated();
 					if(typeof this.inspectorDiv != "undefined"){
@@ -433,20 +453,99 @@
 			}
 
 
+			var	rampMaterial = new THREE.LineMaterial( { 
+				color: 0xffffff, 
+				vertexColors: THREE.VertexColors,
+				linewidth:0.01
+			} );
 
-			var nodes = [];
+			class Ramp{
+				constructor(n1,n2){
+					this.n1 = n1;
+					this.n2 = n2;
+
+					this.n1.onColourUpdatedListeners.push(this);
+					this.n2.onColourUpdatedListeners.push(this);
+
+					this.geometry = new THREE.LineGeometry();
+					this.N = 10;
+					var positions = new Float32Array(this.N * 3);
+					this.geometry.setPositions(positions);
+					var colours = new Float32Array(this.N * 3);
+					this.geometry.setColors(colours);
+
+					this.line = new THREE.Line2(this.geometry,rampMaterial);
+					this.line.computeLineDistances();
+					scene.add(this.line);
+
+					this.update();
+				}
+
+				getxyL(t){
+					var out = {};
+					out.L = this.n2.L * t +  this.n1.L * (1-t);
+					out.x = this.n2.x * t +  this.n1.x * (1-t);
+					out.y = this.n2.y * t +  this.n1.y * (1-t);
+					return out;
+				}
+
+
+
+				update() {
+					var positions = [];
+					var colours = [];
+					for(var k=0;k<this.N;k++){
+						var t = 1.0 / (this.N-1) * k;
+						var xyL = this.getxyL(t);
+						var pos = xyLtopos(xyL.x,xyL.y,xyL.L);
+						var FC = xytoFC(xyL.x,xyL.y);
+						var col = FCLtoRGB(FC.F,FC.C,xyL.L).gl();
+
+						
+
+						positions.push(pos.x,pos.y,pos.z);
+						colours.push(col[0],col[1],col[2]);
+					}
+					
+					this.line.geometry.setPositions(positions);
+					this.line.geometry.setColors(colours);
+				}
+
+				onColourUpdated(){
+
+					this.update();
+					
+				}
+
+				kill(){
+					scene.remove(this.line);
+				}
+			}
+
+
+
+
 
 			var gnode = new WhitePointNode(50,0,0);
-			nodes.push(gnode.box);
 
-			// for(var i =0;i<40; i++){
+
+
+			function randomNode(){
+				 return new DraggableNode(Math.random()*100,Math.random()*200-100,Math.random()*200-100);
+			}
+
+			//for(var i =0;i<40; i++){
 			// 	var newnode = new Node(Math.random()*100,Math.random()*200-100,Math.random()*200-100);
 			// 	nodes.push(newnode.box);
 			// }
 
+			var test1 = randomNode();
+			var test2 = randomNode();
+			var ramp = new Ramp(test1,test2);
+
 			function addNewNode(){
-				var newnode = new DraggableNode(Math.random()*100,Math.random()*200-100,Math.random()*200-100);
-				nodes.push(newnode.box);
+				var newnode = randomNode();
+
 			}
 
 
@@ -469,7 +568,7 @@
 				if(typeof dragControls != "undefined"){
 					dragControls.dispose();
 				}
-				dragControls = new THREE.DragControls( nodes, camera, renderer.domElement);
+				dragControls = new THREE.DragControls( draggableNodes, camera, renderer.domElement);
 
 				dragControls.addEventListener( 'drag', function ( event ) {
 				 		event.object.daddy.updateFromPosition();
