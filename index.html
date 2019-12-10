@@ -398,7 +398,7 @@
 				kill(){
 					super.kill();
 					scene.remove(this.box);
-					draggableNodes.splice(nodes.indexOf(this.box),1);
+					draggableNodes.splice(draggableNodes.indexOf(this.box),1);
 					this.topDiv.remove();
 				}
 
@@ -496,7 +496,7 @@
 					this.mu = 0;
 
 					this.inspectorDiv = rampInspectorTemplate.content.cloneNode(true);
-
+					this.topDiv = this.inspectorDiv.querySelector(".rampinspector");
 					this.lambdaSlider = this.inspectorDiv.querySelector(".lambdaslider");
 					this.muSlider = this.inspectorDiv.querySelector(".muslider");
 					this.rectDiv = this.inspectorDiv.querySelector(".inspectorramprect");
@@ -576,6 +576,7 @@
 				}
 
 				kill(){
+					this.topDiv.remove();
 					scene.remove(this.line);
 				}
 			}
