@@ -21,7 +21,18 @@
 		</div>
 		<div id="panel">
 			<div id="panelcolours">
+				<template id="nodeinspectortemplate">
+					<div class="nodeinspector">
+						<div class="inspectorcoloursquare"></div>
+						<div class="inspectorcolourright">
+							<div class="inspectorcolourname"></div>
+							<div class="inspectorcolourinfo"></div>
 
+						</div>
+						<div class="inspectornodedelete"><a>x</a></div>
+
+					</div>
+				</template>
 			</div>
 		</div>
 		<script src="scripts/three.min.js"></script>
@@ -33,25 +44,7 @@
 		  <script src="scripts/ntc.js"></script>
 		<script>
 
-			var nodeInspectorTemplate = document.createElement("div");
-			nodeInspectorTemplate.className = "nodeinspector";
-
-
-			var nodeInspectorSquare = document.createElement("div");
-			nodeInspectorSquare.className = "inspectorcoloursquare";
-			nodeInspectorTemplate.appendChild(nodeInspectorSquare);
-
-			var nodeInspectorRight = document.createElement("div");
-			nodeInspectorRight.className = "inspectorcolourright";
-			nodeInspectorTemplate.appendChild(nodeInspectorRight);
-
-			var nodeInspectorName = document.createElement("div");
-			nodeInspectorName.className = "inspectorcolourname";
-			nodeInspectorRight.appendChild(nodeInspectorName);
-
-			var nodeInspectorInfo = document.createElement("div");
-			nodeInspectorInfo.className = "inspectorcolourinfo";
-			nodeInspectorRight.appendChild(nodeInspectorInfo);
+			var nodeInspectorTemplate = document.querySelector("#nodeinspectortemplate");
 
 
 			const frustumSize = 2;
@@ -155,7 +148,7 @@
 
 
 
-            // window.addEventListener('resize', onWindowResize, false);
+            window.addEventListener('resize', onWindowResize, false);
             function onWindowResize(){
 
             	updateCamera();
@@ -205,68 +198,26 @@
 					this.x = x;
 					this.y = y;
 
-					this.size = 0.07;
-
-					this.boxGeometry = new THREE.BoxGeometry(this.size,this.size,this.size);
-					this.boxMaterial = new THREE.MeshBasicMaterial( 
-						{ color: 0xffffff});
-					this.box = new THREE.Mesh(this.boxGeometry,this.boxMaterial);
-
-					this.box.daddy = this;
-
-					scene.add(this.box);
-
-
-					this.inspectorDiv = nodeInspectorTemplate.cloneNode(true);
-					this.squareDiv = this.inspectorDiv.querySelector(".inspectorcoloursquare");
-					this.nameDiv = this.inspectorDiv.querySelector(".inspectorcolourname");
-					this.infoDiv = this.inspectorDiv.querySelector(".inspectorcolourinfo");
-
-
-					this.Lincreased = false;
-					this.update();
-
 					
-					document.getElementById("panelcolours").appendChild(this.inspectorDiv);
 				};
 
 				onColourUpdated(){
-					if(typeof this.inspectorDiv != "undefined"){
-					var hex = this.rgb.hex();
-					this.squareDiv.style.background = hex;
 
-					this.nameDiv.innerHTML = ntc.name(hex)[1];
-					this.infoDiv.innerHTML = hex;
-				}
 				};
 
-				updateFromPosition(){
-					var oldL = this.L
-
-					var position = this.box.position;
-					if (!lockChromaticity){
-						this.x = 100*position.x;
-						this.y = 100*position.y;
-					};
-					this.L = 50*(position.z+1);
-
-					this.Lincreased = this.L > oldL;
-					
-					this.update();
-				}
 
 				update(){
 
-					var position = new THREE.Vector3(this.x/100.,this.y/100.,this.L/50.-1);
+					this.position = new THREE.Vector3(this.x/100.,this.y/100.,this.L/50.-1);
 
 					var angle = (-Math.atan2(this.y,this.x)+2*Math.PI)%(2*Math.PI);
-					var F = angle /(2*Math.PI) * 12;
+					this.F = angle /(2*Math.PI) * 12;
 
-					var C = Math.sqrt(this.y*this.y +  this.x*this.x);
-					var h = Ftoh(F);
+					this.C = Math.sqrt(this.y*this.y +  this.x*this.x);
+					this.h = Ftoh(this.F);
 
 
-					this.rgb = chroma.lch(this.L,C,h);
+					this.rgb = chroma.lch(this.L,this.C,this.h);
 
 
 					if(this.rgb.clipped()){
@@ -303,21 +254,123 @@
 						return;
 					}
 
-					//this.color = new THREE.Color(this.L,this.L,this.L);
 
-					this.box.material.color.set(this.rgb.hex());
-					this.box.position.copy(position);
+				}
 
-					this.box.updateMatrixWorld();
+				destroy(){
 
-					this.onColourUpdated();
 				}
 
 
 				
 			}
 
-			class WhitePointNode extends Node{
+
+			class DraggableNode extends Node{
+				constructor(L,x,y){
+					super(L,x,y);
+					this.size = 0.07;
+
+					this.boxGeometry = new THREE.BoxGeometry(this.size,this.size,this.size);
+					this.boxMaterial = new THREE.MeshBasicMaterial( 
+						{ color: 0xffffff});
+					this.box = new THREE.Mesh(this.boxGeometry,this.boxMaterial);
+
+					this.box.daddy = this;
+
+					scene.add(this.box);
+
+
+					this.inspectorDiv = nodeInspectorTemplate.content.cloneNode(true);
+
+					this.topDiv = this.inspectorDiv.querySelector(".nodeinspector");
+					this.squareDiv = this.inspectorDiv.querySelector(".inspectorcoloursquare");
+					this.nameDiv = this.inspectorDiv.querySelector(".inspectorcolourname");
+					this.infoDiv = this.inspectorDiv.querySelector(".inspectorcolourinfo");
+					this.deleteA = this.inspectorDiv.querySelector("a");
+					var thisnode = this;
+					
+					
+					this.Lincreased = false;
+					this.update();
+
+					
+					this.inspectorDiv = document.getElementById("panelcolours").appendChild(this.inspectorDiv);
+
+					this.deleteA.addEventListener("click",this.onClickDelete.bind(this));
+				}
+
+				onClickDelete(){
+					
+					this.kill();
+				}
+
+				kill(){
+					scene.remove(this.box);
+					nodes.splice(nodes.indexOf(this.box),1);
+					this.topDiv.remove();
+				}
+
+				update(){
+					super.update();
+
+					this.box.material.color.set(this.rgb.hex());
+					this.box.position.copy(this.position);
+
+					this.box.updateMatrixWorld();
+
+					this.onColourUpdated();
+
+				}
+
+				stringFCL(){
+					var befcol = toneCodes[Math.floor(this.F)];
+					var aftcol = toneCodes[Math.floor(this.F+1)%12];
+					var frac = this.F%1;
+					var cname;
+					if(frac < 0.25)
+						cname = befcol;
+					else if (frac < 0.75)
+						cname = `${befcol}-${aftcol}`;
+					else
+						cname = aftcol;
+
+					if (this.C < 0.3)
+						cname = "N";
+					
+
+					
+					return `L=${this.L.toFixed(1)}, C=${this.C.toFixed(1)}, F=${this.F.toFixed(2)} (${cname})`
+				}
+
+				onColourUpdated(){
+					super.onColourUpdated();
+					if(typeof this.inspectorDiv != "undefined"){
+						var hex = this.rgb.hex();
+						this.squareDiv.style.background = hex;
+
+						this.nameDiv.innerHTML = ntc.name(hex)[1];
+						this.infoDiv.innerHTML = this.stringFCL();
+					}
+				}
+
+				updateFromPosition(){
+					var oldL = this.L
+
+					var position = this.box.position;
+					if (!lockChromaticity){
+						this.x = 100*position.x;
+						this.y = 100*position.y;
+					};
+					this.L = 50*(position.z+1);
+
+					this.Lincreased = this.L > oldL;
+					
+					this.update();
+				}
+			}
+
+			class WhitePointNode extends DraggableNode{
 				constructor(L,x,y){
 					super(L,x,y);
 					var osize = this.size * 1.1;
@@ -326,6 +379,8 @@
 					var outlineGeometry = new THREE.BoxGeometry(osize,osize,osize);
 					this.outline = new THREE.Mesh(outlineGeometry,outlineMaterial);
 					scene.add(this.outline);
+
+					this.deleteA.remove();
 				}
 
 				onColourUpdated() {
@@ -352,7 +407,7 @@
 			// }
 
 			function addNewNode(){
-				var newnode = new Node(Math.random()*100,Math.random()*200-100,Math.random()*200-100);
+				var newnode = new DraggableNode(Math.random()*100,Math.random()*200-100,Math.random()*200-100);
 				nodes.push(newnode.box);
 			}
 
