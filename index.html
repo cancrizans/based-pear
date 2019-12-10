@@ -197,6 +197,19 @@
 				return chroma.lch(L,C,h)
 			}
 
+			function postoxyL(pos){
+				var out = {};
+				out.x = 100*pos.x;
+				out.y = 100*pos.y;
+				out.L = 50*(pos.z+1);
+				return out;
+
+			}
+
+			function xyLtopos(x,y,L){
+				return new THREE.Vector3(x/100.0,y/100.0,L/50.-1.);
+			}
+
 			class Node{
 				constructor(L,x,y){
 					this.L = L;
@@ -213,7 +226,8 @@
 
 				update(){
 
-					this.position = new THREE.Vector3(this.x/100.,this.y/100.,this.L/50.-1);
+					//this.position = new THREE.Vector3(this.x/100.,this.y/100.,this.L/50.-1);
+					this.position = xyLtopos(this.x,this.y,this.L);
 
 					var angle = (-Math.atan2(this.y,this.x)+2*Math.PI)%(2*Math.PI);
 					this.F = angle /(2*Math.PI) * 12;
@@ -379,11 +393,14 @@
 					var oldL = this.L
 
 					var position = this.box.position;
+
+					var xyL = postoxyL(position);
+
 					if (!lockChromaticity){
-						this.x = 100*position.x;
-						this.y = 100*position.y;
+						this.x = xyL.x;
+						this.y = xyL.y;
 					};
-					this.L = 50*(position.z+1);
+					this.L = xyL.L;
 
 					this.Lincreased = this.L > oldL;
 					
