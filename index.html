@@ -192,6 +192,11 @@
 			scene.add(whitePointGrid);
 
 
+			function FCLtoRGB(F,C,L) {
+				h = Ftoh(F);
+				return chroma.lch(L,C,h)
+			}
+
 			class Node{
 				constructor(L,x,y){
 					this.L = L;
@@ -214,10 +219,8 @@
 					this.F = angle /(2*Math.PI) * 12;
 
 					this.C = Math.sqrt(this.y*this.y +  this.x*this.x);
-					this.h = Ftoh(this.F);
 
-
-					this.rgb = chroma.lch(this.L,this.C,this.h);
+					this.rgb = FCLtoRGB(this.F,this.C,this.L);		
 
 
 					if(this.rgb.clipped()){
@@ -247,11 +250,29 @@
 
 					if(this.rgb.clipped()){
 
-						var factor = .99;
-						this.x*=factor;
-						this.y*=factor;
+						//gamut wall binary search
+						var step = this.C;
+						var tC = this.C;
+						var clipped = true;
+
+						for(var i=0; i<10; i++){
+							step = step/2;
+							tC = tC + (clipped ? -step : step);
+
+							clipped = FCLtoRGB(this.F,tC,this.L).clipped();
+							
+						}
+
+						if(clipped)
+							tC = tC-step;
+
+						this.x *= tC / this.C;
+						this.y *= tC / this.C;
+
+
 						this.update();
 						return;
+
 					}
 
 
