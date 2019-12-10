@@ -17,7 +17,7 @@ Colours are represented by little boxes ("Nodes") in 3d space, using a specialis
 --|---|---|---|---|---|---|---|---|---|---|---|---
 RO| O | OY| Y | YG| G | BG| B | BV| V | VR| R | RO
 
-This coordinate is convenient for artists as it encodes information relevant to hue harmony. To say it as compactly as possible, the harmonic relationship between two colours depend only on the difference in F.
+This coordinate is convenient for artists as it encodes information relevant to hue harmony. To say it as compactly as possible, the harmonic relationship between two colours depends only on the difference in F.
 
 Some values of FCL do not correspond to colours in the RGB gamut, which are colours representable by a digital display. (They might correspond to real colours not in the RGB gamut, or they might simply be impossible at all). This is enforced as the applet will prevent you from even dragging colours outside and will clamp them to stay on the walls of the gamut. 
 
