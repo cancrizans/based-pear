@@ -29,6 +29,8 @@ By right clicking on the background and dragging you can rotate the view. With t
 
 With the `Q` key you can switch between Perspective and Orthographic camera. Orthographic is especially useful. Orthographic from above reproduces a standard "luma-ignorant" colour wheel.
 
+### Nodes
+
 With the `N` key you add a node.
 
 You can then drag nodes around to change the colour. The colour will always be forced to stay within gamut, but it will try to keep as big a chrominance as possible.
@@ -39,4 +41,19 @@ Similarly, by holding `T` while dragging instead, you lock a node's hue. So you 
 
 With the little x in the top right of a node's entry in the inspector you can delete a node. You cannot delete the first node, which is the neutral point / background.
 
+### Ramps
 
+Last two nodes you clicked will be marked with a white border in the inspector. These count as selected.
+
+With the `B` key you create a ramp between two selected nodes and deselect them.
+
+When a portion of a ramp lies outside of gamut, it is displayed as black. Move the nodes or change the parameters so that it fits inside.
+
+Ramps display their gradient in the inspector. Below are two sliders for two blending parameters:
+
+* Chroma bend: this only acts horizontally and bends the middle of the curve towards or away from neutral grey. So it changes saturation of interpolating colours. This doesn't work good if the nodes have the same hue.
+* Luma bend: this only acts vertically and thus only changes luminances. Luminance always increases monotonically from darker to lighter node, but this slider will let you "squish" luminances up or down within that restriction. This doesn't do anything if the nodes have the same luminance.
+
+With the little x in the top right of a ramp's entry in the inspector you can delete the ramp.
+
+You can have multiple ramps between the same two colours. Each can have its own bending params.
