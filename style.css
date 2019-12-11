@@ -4,6 +4,7 @@ body {
 	margin: 0; 
 	font-family: 'Roboto', sans-serif;
 	overflow: hidden;
+	font-size: 14px;
 }
 canvas { 
 	width: 100%;
@@ -26,7 +27,7 @@ canvas {
 	padding: 20px;
 	color: white;
 
-	width: 15%;
+	width: 20%;
 	height: 100%;
 	overflow: scroll;
 }
@@ -69,7 +70,7 @@ canvas {
 	
 }
 
-.inspectornodedelete{
+.inspectordeletecontainer{
 	position: absolute;
 	right:2px;
 	top: 2px;

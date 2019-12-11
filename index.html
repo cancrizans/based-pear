@@ -18,6 +18,7 @@
 				<li>Y (hold): lock chromaticity</li>
 				<li>T (hold): lock hue</li>
 				<li>N: add new node</li>
+				<li>B: add ramp between last two clicked nodes</li>
 			</ul>				
 		</div>
 		<div id="panel">
@@ -30,7 +31,7 @@
 							<div class="inspectorcolourinfo"></div>
 
 						</div>
-						<div class="inspectornodedelete"><a>x</a></div>
+						<div class="inspectordeletecontainer"><a class="inspectordelete">x</a></div>
 
 					</div>
 				</template>
@@ -46,6 +47,8 @@
 						<div class="slidercontainer">
   							<input type="range" min="-1" max="1" value="0" step="0.005" class="muslider">
 						</div>
+
+						<div class="inspectordeletecontainer"><a class="inspectordelete">x</a></div>
 					</div>
 				</template>
 			</div>
@@ -94,12 +97,12 @@
 
 
 			var camera;
-            var cameraPerspective = true;
+            var cameraPerspective = false;
 
             var dragControls;
 
             function setupCamera(){
-            	var campos = new THREE.Vector3();
+            	var campos = new THREE.Vector3(0,1,1);
             	if(typeof camera != "undefined"){
             	campos = camera.position.clone();
             	};
@@ -119,9 +122,13 @@
 
             	}
 
+            	
             	camera.position.copy(campos);
+				
 				camera.lookAt(new THREE.Vector3());
+				
             	camera.updateProjectionMatrix();
+
             		
             }
 
@@ -226,7 +233,8 @@
 				);
 			var hueLockDisplay = new THREE.Line(geometryHueLock,gridMaterial);
 			scene.add(hueLockDisplay);
-			//hueLockDisplay.quaternion.setFromAxisAngle( new THREE.Vector3( 0, 1, 0 ), Math.PI / 2 );
+			hueLockDisplay.visible=false;
+			
 
 
 			function xytoFC(x,y){
@@ -530,7 +538,12 @@
 					this.lambdaSlider = this.inspectorDiv.querySelector(".lambdaslider");
 					this.muSlider = this.inspectorDiv.querySelector(".muslider");
 					this.rectDiv = this.inspectorDiv.querySelector(".inspectorramprect");
+					this.deleteA = this.inspectorDiv.querySelector(".inspectordelete");
+
 					this.inspectorDiv = document.getElementById("panelramps").appendChild(this.inspectorDiv);
+					
+
+					this.deleteA.addEventListener("click",this.onClickDelete.bind(this));
 
 
 					this.n1.onColourUpdatedListeners.push(this);
@@ -542,7 +555,17 @@
 
 
 					this.update();
+				
+
+
+
 				}
+
+				onClickDelete(){
+					
+					this.kill();
+				}
+
 
 				getxyL(t,tL){
 					var out = {};
@@ -616,6 +639,33 @@
 
 
 
+			//Node selection
+
+			var selectedNodes = [];
+
+			function popSelectNode(){
+					var temp = selectedNodes.shift();
+					temp.topDiv.style.borderColor = "black";
+			}
+
+			function clearSelection(){
+				while(selectedNodes.length>0)
+					popSelectNode();
+			}
+
+			function selectNode(node){
+				if(selectedNodes.includes(node))
+					return;
+
+				selectedNodes.push(node);
+				node.topDiv.style.borderColor = "white";
+
+				while(selectedNodes.length>2){
+					popSelectNode();
+				}
+
+			}
+
 
 			var gnode = new WhitePointNode(50,0,0);
 
@@ -639,6 +689,13 @@
 
 			}
 
+			function addNewRamp(){
+				if(selectedNodes.length >= 2){
+					var ramp = new Ramp(selectedNodes[0],selectedNodes[1]);
+					clearSelection();
+				}
+			}
+
 
 
 
@@ -651,8 +708,8 @@
 					LEFT: THREE.MOUSE.PAN,
 					MIDDLE: THREE.MOUSE.DOLLY
 				}
-				camera.position.set(2,0,0);
-				camera.lookAt(new THREE.Vector3);
+				//camera.position.set(2,0,0);
+				//camera.lookAt(new THREE.Vector3);
 				orbitControls.update();
 
 			function CreateDragControls() {
@@ -666,6 +723,7 @@
 				 	} );
 
 				dragControls.addEventListener( 'dragstart', function ( event ) {
+						selectNode(event.object.daddy);
 				 		orbitControls.enabled = false;
 				 	} );
 				dragControls.addEventListener( 'dragend', function ( event ) {
@@ -692,6 +750,9 @@
                  }
                  if (event.key == "n") {
                  	addNewNode();
+                 };
+                 if (event.key == "b") {
+                 	addNewRamp();
                  };
             };
             function onDocumentKeyUp(event) { 
