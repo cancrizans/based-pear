@@ -16,6 +16,7 @@
 				<li>Left click and drag: move nodes</li>
 				<li>Q: toggle Perspective/Orthographic view</li>
 				<li>Y (hold): lock chromaticity</li>
+				<li>T (hold): lock hue</li>
 				<li>N: add new node</li>
 			</ul>				
 		</div>
@@ -85,7 +86,7 @@
 
 
 			var lockChromaticity = false;
-
+			var lockHue = false;
 
 			var scene = new THREE.Scene();
 
@@ -211,6 +212,21 @@
 			whitePointGrid.add(Axes);
 
 			scene.add(whitePointGrid);
+
+
+			var geometryHueLock = new THREE.Geometry();
+			var hlw = 1;
+			var hlh = 1;
+			geometryHueLock.vertices.push(
+				new THREE.Vector3(-hlw,0,-hlh),
+				new THREE.Vector3(-hlw,0,hlh),
+				new THREE.Vector3(hlw,0,hlh),
+				new THREE.Vector3(hlw,0,-hlh),
+				new THREE.Vector3(-hlw,0,-hlh)
+				);
+			var hueLockDisplay = new THREE.Line(geometryHueLock,gridMaterial);
+			scene.add(hueLockDisplay);
+			//hueLockDisplay.quaternion.setFromAxisAngle( new THREE.Vector3( 0, 1, 0 ), Math.PI / 2 );
 
 
 			function xytoFC(x,y){
@@ -427,14 +443,28 @@
 				updateFromPosition(){
 					var oldL = this.L
 
-					var position = this.box.position;
+					var draggedPosition = this.box.position;
 
-					var xyL = postoxyL(position);
+					var xyL = postoxyL(draggedPosition);
 
-					if (!lockChromaticity){
+
+					if(lockHue && this.C > 0.01){
+						//var nC = Math.sqrt(xyL.x*xyL.x + xyL.y*xyL.y);
+						var coeff = (this.x * xyL.x + this.y * xyL.y)/(this.C*this.C);
+						this.x *= coeff;
+						this.y *= coeff;
+
+						hueLockDisplay.visible = true;
+						hueLockDisplay.quaternion.setFromAxisAngle( new THREE.Vector3( 0, 0, 1 ), Math.atan2(this.y,this.x) );
+
+					}
+					else if (!lockChromaticity){
 						this.x = xyL.x;
 						this.y = xyL.y;
 					};
+
+
+
 					this.L = xyL.L;
 
 					this.Lincreased = this.L > oldL;
@@ -552,10 +582,12 @@
 
 						var FC = xytoFC(x,y);
 						var col = FCLtoRGB(FC.F,FC.C,L);
-						var gl = col.gl();
+						
 
 						if(col.clipped())
-							gl = [0,0,0];
+							col = chroma('black');
+
+						var gl = col.gl();
 						
 
 						positions.push(pos.x,pos.y,pos.z);
@@ -639,6 +671,7 @@
 				dragControls.addEventListener( 'dragend', function ( event ) {
 						event.object.daddy.updateFromPosition();
 				 		orbitControls.enabled = true;
+				 		hueLockDisplay.visible = false;
 				 	} );
 			};
 
@@ -654,6 +687,9 @@
                  if (event.key == "y") {
                  	lockChromaticity = true;
                  };
+                 if (event.key == "t"){
+                 	lockHue = true;
+                 }
                  if (event.key == "n") {
                  	addNewNode();
                  };
@@ -662,6 +698,9 @@
                  if (event.key == "y") {
                  	lockChromaticity = false;
                  };
+                 if (event.key == "t"){
+                 	lockHue = false;
+                 }
             };
 
 
