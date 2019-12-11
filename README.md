@@ -35,4 +35,6 @@ You can then drag nodes around to change the colour. The colour will always be f
 
 By holding the `Y` key while dragging, you can lock a node's chromaticity and change only the luminance, i.e. only move it vertically.
 
+Similarly, by holding `T` while dragging instead, you lock a node's hue. So you only change chroma and luminance.
+
 With the little x in the top right of a node's entry in the inspector you can delete a node. You cannot delete the first node, which is the neutral point / background.
