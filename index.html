@@ -13,8 +13,9 @@
 			<ul>
 				<li>Right click and drag: rotate camera</li>
 				<li>Mouse wheel: zoom</li>
-				<li>Left click and drag: move nodes</li>
 				<li>Q: toggle Perspective/Orthographic view</li>
+				<li>W: toggle RGB gamut cage</li>
+				<li>Left click and drag: move nodes</li>
 				<li>Y (hold): lock chromaticity</li>
 				<li>T (hold): lock hue</li>
 				<li>N: add new node</li>
@@ -76,14 +77,20 @@
 
 			const toneCodes = ["RO","O","OY","Y","YG","G","BG","B","BV","V","VR","R"];
 
-			const fletch_h = [19, 37, 45, 63, 83, 102, 122, 137, 170, 263, 302, 331, 19 + 360, 
+			const fletch_h = [331-360,19, 37, 45, 63, 83, 102, 122, 137, 170, 263, 302, 331, 19 + 360, 
  37 + 360, 45 + 360, 63 + 360];
- 			const Fvals = [-2,-1,0,1,2,3,4,5,6,7,8,9,10,11,12,13];
+ 			const Fvals = [-3,-2,-1,0,1,2,3,4,5,6,7,8,9,10,11,12,13];
 
  			var linearinterp = everpolate.linear;
 
  			function Ftoh(F){
  				return linearinterp(F,Fvals,fletch_h);
+ 			}
+ 			function htoF(h){
+ 				var out = linearinterp(h,fletch_h,Fvals)%12;
+ 				if(out < 0)
+ 					out+=12;
+ 				return out;
  			}
 
 
@@ -221,6 +228,9 @@
 			scene.add(whitePointGrid);
 
 
+
+
+
 			var geometryHueLock = new THREE.Geometry();
 			var hlw = 1;
 			var hlh = 1;
@@ -247,9 +257,37 @@
 				return out;
 			}
 
+			function FCtoxy(F,C){
+				var out = {};
+				var angle = F/12 * (2*Math.PI);
+				out.x = C * Math.cos(angle) ;
+				out.y = -C * Math.sin(angle) ;
+				return out;
+			}
+
+			function FCLtoxyL(fcl){
+				var xy = FCtoxy(fcl.F,fcl.C);
+				var out = {
+					L : fcl.L,
+					x : xy.x,
+					y : xy.y
+				};
+				return out;
+			}
+
 			function FCLtoRGB(F,C,L) {
 				h = Ftoh(F);
 				return chroma.lch(L,C,h)
+			}
+
+			function RGBtoFCL(r,g,b){
+				var lch = chroma.gl(r,g,b).lch();
+				var out = {};
+				out.L = lch[0];
+				out.C = lch[1];
+				out.F = htoF(lch[2]);
+				return out;
+
 			}
 
 			function postoxyL(pos){
@@ -264,6 +302,69 @@
 			function xyLtopos(x,y,L){
 				return new THREE.Vector3(x/100.0,y/100.0,L/50.-1.);
 			}
+
+
+
+			function RGBboundaryCurve(start, end){
+				var geom = new THREE.Geometry();
+				for (var t=0; t<=1.0001; t+=0.025){
+					var colrgb = new THREE.Vector3();
+					colrgb.lerpVectors(start,end,t);
+					
+					var FCL = RGBtoFCL(colrgb.x,colrgb.y,colrgb.z);
+					var L = FCL.L;
+					var C = FCL.C;
+					var F = FCL.F;
+
+					var xy = FCtoxy(F,C);
+
+					geom.vertices.push(xyLtopos(xy.x,xy.y,L));
+				}
+				
+				return new THREE.Line(geom,gridMaterial);
+			}
+
+			var rgbs = {
+				white: new THREE.Vector3(1,1,1),
+				black: new THREE.Vector3(0,0,0),
+				red: new THREE.Vector3(1,0,0),
+				green: new THREE.Vector3(0,1,0),
+				blue: new THREE.Vector3(0,0,1),
+				cyan: new THREE.Vector3(0,1,1),
+				magenta: new THREE.Vector3(1,0,1),
+				yellow: new THREE.Vector3(1,1,0)
+
+			}
+
+			var gamutCage = new THREE.Object3D();
+
+			gamutCage.add(RGBboundaryCurve(rgbs.black,rgbs.red));
+			gamutCage.add(RGBboundaryCurve(rgbs.black,rgbs.green));
+			gamutCage.add(RGBboundaryCurve(rgbs.black,rgbs.blue));
+			gamutCage.add(RGBboundaryCurve(rgbs.red,rgbs.yellow));
+			gamutCage.add(RGBboundaryCurve(rgbs.red,rgbs.magenta));
+			gamutCage.add(RGBboundaryCurve(rgbs.green,rgbs.cyan));
+			gamutCage.add(RGBboundaryCurve(rgbs.green,rgbs.yellow));
+			gamutCage.add(RGBboundaryCurve(rgbs.blue,rgbs.cyan));
+			gamutCage.add(RGBboundaryCurve(rgbs.blue,rgbs.magenta));
+			gamutCage.add(RGBboundaryCurve(rgbs.cyan,rgbs.white));
+			gamutCage.add(RGBboundaryCurve(rgbs.magenta,rgbs.white));
+			gamutCage.add(RGBboundaryCurve(rgbs.yellow,rgbs.white));
+
+			scene.add(gamutCage)
+			gamutCage.visible = false;
+					
+			var testfcl = RGBtoFCL(1,0,0);
+			var testxy = FCtoxy(testfcl.F,testfcl.C);
+			var testpos = xyLtopos(testxy.x,testxy.y,testfcl.L);
+			var testbackrgb = FCLtoRGB(testfcl.F,testfcl.C,testfcl.L);
+
+			console.log(testfcl);
+			console.log(testxy);
+			console.log(testpos);
+			console.log(testbackrgb);
+
+
 
 			class Node{
 				constructor(L,x,y){
@@ -684,6 +785,13 @@
 			var test2 = randomNode();
 			var ramp = new Ramp(test1,test2);
 
+			// for(var cn in rgbs){
+			// 	var c = rgbs[cn];
+			// 	var xyL = FCLtoxyL(RGBtoFCL(c.x,c.y,c.z));
+				
+			// 	var hmmm = new DraggableNode(xyL.L,xyL.x,xyL.y);
+			// }
+
 			function addNewNode(){
 				var newnode = randomNode();
 
@@ -753,6 +861,9 @@
                  };
                  if (event.key == "b") {
                  	addNewRamp();
+                 };
+                 if (event.key == "w") {
+                 	gamutCage.visible = !gamutCage.visible;
                  };
             };
             function onDocumentKeyUp(event) { 

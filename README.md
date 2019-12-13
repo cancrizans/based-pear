@@ -21,13 +21,13 @@ This coordinate is convenient for artists as it encodes information relevant to 
 
 Some values of FCL do not correspond to colours in the RGB gamut, which are colours representable by a digital display. (They might correspond to real colours not in the RGB gamut, or they might simply be impossible at all). This is enforced as the applet will prevent you from even dragging colours outside and will clamp them to stay on the walls of the gamut. 
 
-The gamut is a really weird shape, especially in FCL coordinates, so I don't have much to say except explore it and try to feel it around.
-
 ## Instructions
 
 By right clicking on the background and dragging you can rotate the view. With the mouse wheel you can zoom in an out.
 
 With the `Q` key you can switch between Perspective and Orthographic camera. Orthographic is especially useful. Orthographic from above reproduces a standard "luma-ignorant" colour wheel.
+
+With `W` you can toggle visibility of a cage that displays the bounds of the RGB gamut, so you can have an idea of where the limitations are.
 
 ### Nodes
 
