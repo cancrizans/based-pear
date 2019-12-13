@@ -190,42 +190,61 @@
             	updateCamera();
             }
 
+
+            var gridSolidMaterial = new THREE.LineBasicMaterial( {color: 0xffffffff});
+            var gridDashedMaterial = new THREE.LineDashedMaterial( {
+            	color: 0xffffff,
+            	linewidth: 1,
+            	scale: 1,
+            	dashSize: 0.01,
+            	gapSize: 0.01,
+            } );
 			
+            function createGrid(gridMaterial,doText){
+				var whitePointGrid = new THREE.Object3D();
+				whitePointGrid.position.set(0,0,0);
 
-			var whitePointGrid = new THREE.Object3D();
-			whitePointGrid.position.set(0,0,0);
-
-			var gridMaterial = new THREE.LineBasicMaterial( {color: 0xffffffff});
+				
 
 
-			var geometryAxes = new THREE.Geometry();
+				var geometryAxes = new THREE.Geometry();
 
-			var k;
-			for (k=0; k<12; k++)
-			{
-				var theta = -2* Math.PI * k / 12.0;
-				geometryAxes.vertices.push(new THREE.Vector3(-Math.cos(theta),-Math.sin(theta),0));
-				geometryAxes.vertices.push(new THREE.Vector3(Math.cos(theta),Math.sin(theta),0));
+				var k;
+				for (k=0; k<12; k++)
+				{
+					var theta = -2* Math.PI * k / 12.0;
+					geometryAxes.vertices.push(new THREE.Vector3(-Math.cos(theta),-Math.sin(theta),0));
+					geometryAxes.vertices.push(new THREE.Vector3(Math.cos(theta),Math.sin(theta),0));
 
-				var clabel = new SpriteText(toneCodes[k],0.03);
-				clabel.color ='white';
-				clabel.position.set(Math.cos(theta),Math.sin(theta),0);
-				clabel.position.multiplyScalar(1.1);
-				clabel.material.sizeAttenuation=false;
-				whitePointGrid.add(clabel);
+					if(doText){
+					var clabel = new SpriteText(toneCodes[k],0.03);
+					clabel.color ='white';
+					clabel.position.set(Math.cos(theta),Math.sin(theta),0);
+					clabel.position.multiplyScalar(1.1);
+					clabel.material.sizeAttenuation=false;
+					whitePointGrid.add(clabel);
+					}
+				}
+
+				var nlabel = new SpriteText("N",0.03);
+				nlabel.color = "white";
+				nlabel.position.set(0,0,0);
+				nlabel.material.sizeAttenuation = false;
+				scene.add(nlabel);
+
+				var Axes = new THREE.LineSegments(geometryAxes, gridMaterial);
+				Axes.computeLineDistances();
+
+				whitePointGrid.add(Axes);
+				Axes.computeLineDistances();
+				return whitePointGrid;
 			}
 
-			var nlabel = new SpriteText("N",0.03);
-			nlabel.color = "white";
-			nlabel.position.set(0,0,0);
-			nlabel.material.sizeAttenuation = false;
-			scene.add(nlabel);
+			var neutralGrid = createGrid(gridSolidMaterial,true);
+			var shiftedGrid = createGrid(gridDashedMaterial,false);
 
-			var Axes = new THREE.LineSegments(geometryAxes, gridMaterial);
-
-			whitePointGrid.add(Axes);
-
-			scene.add(whitePointGrid);
+			scene.add(neutralGrid);
+			scene.add(shiftedGrid);
 
 
 
@@ -241,7 +260,7 @@
 				new THREE.Vector3(hlw,0,-hlh),
 				new THREE.Vector3(-hlw,0,-hlh)
 				);
-			var hueLockDisplay = new THREE.Line(geometryHueLock,gridMaterial);
+			var hueLockDisplay = new THREE.Line(geometryHueLock,gridSolidMaterial);
 			scene.add(hueLockDisplay);
 			hueLockDisplay.visible=false;
 			
@@ -321,7 +340,7 @@
 					geom.vertices.push(xyLtopos(xy.x,xy.y,L));
 				}
 				
-				return new THREE.Line(geom,gridMaterial);
+				return new THREE.Line(geom,gridSolidMaterial);
 			}
 
 			var rgbs = {
@@ -598,7 +617,7 @@
 				onColourUpdated() {
 					super.onColourUpdated();
 					scene.background = this.box.material.color.clone();
-					whitePointGrid.position.set(this.box.position.x,this.box.position.y,0);
+					shiftedGrid.position.set(this.box.position.x,this.box.position.y,0);
 					if(typeof this.outline != "undefined"){
 						this.outline.position.copy(this.box.position);
 
