@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>FCL colourspace calibration tests</title>
+	<link rel="stylesheet" type="text/css" href="style.css">
+</head>
+<body>
+	<h1>FCL colourspace calibration test</h1>
+	<div id="preamble">
+		<div id="instructions"><p>This is a calibration set up for the parameters of the FCL colour space. Scrolling down you will find controls for changing hues for each Fletcher tone. The first slider controls h0, which is the LCh hue of the colour at mid-range (L = 50). The second slider controls h1, which is a linear correction to hue over different luminances (a hue shift, as the kids say). h1 = 0 means no correction. Positive h1 means lights move clockwise and darks counter-clockwise, negative is backwards.</p>
+			<p>Your goal is to make sure that 1) the hues are as accurate as possible for each Fletcher tone over the whole range of luminances and 2) that complementaries are truly as displeasing as possible over all luminances. To help you, I present you with chips of maximum and half-maximum chroma at luminances L = 5, 10, ..., 95, and then with a slit test for all 6 complementary pairs.</p>
+			<p>Below is a simple setup for saving/loading progress and data. To "save", just copy the string of the left textfield somewhere. To "load", repaste your parameter string into the right textfield and click load. Be careful with using the Load button or with reloading/closing tab as there is no undo, and I won't put my hands in your cache.</p>
+		</div>
+		<div id="saveload">
+			<textarea value="" class="savefield saveloadfield" readonly></textarea>
+			<textarea value="" class="loadfield saveloadfield"></textarea>
+			<button onclick="load()">Load from string</button>
+		</div>
+
+	</div>
+
+
+	<div id="testcontainer">
+		<template id="tone">
+			<div class="tonepanel">
+				<div class="tonetitle"></div>
+				<div class="chipscontainer"></div>
+				<input type="range" value="0" min="0" max="360" step="0.25" class="slider h0slider">
+				<input type="range" value="0" min="-1" max="1" step="0.005" class="slider h1slider">
+			</div>
+		</template>
+
+		<template id="compair">
+			<div class="compairpanel">
+			</div>
+		</template>
+
+
+		<template id="comparecard">
+			<div class="cardbg">
+				<div class="cardslit"></div>
+			</div>
+		</template>
+
+		<template id="separator">
+			<div class="separator"></div>
+		</template>
+
+	</div>
+
+
+
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/chroma-js/2.0.6/chroma.min.js"></script>
+
+	<script type="text/javascript">
+
+		const toneNames = "RO O OY Y YG G BG B BV V VR R".split(" ");
+
+		var h0_start = [45, 63, 83, 102, 122, 137, 170, 263, 302, 331, 19, 37];
+		var h1_start = [0,0,0,0,0,0,0,0,0,0,0,0];
+
+
+		var state = {
+			h0 : h0_start,
+			h1 : h1_start
+		}
+		var tones;
+		var pairs;
+
+		const lumas = [5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90,95];
+		const lumas_slit = [20, 50, 80];
+		const rel_chromas = [1,0.5];
+
+		var toneTemplate = document.querySelector("#tone");
+		var compairTemplate = document.querySelector("#compair");
+		var compairCardTemplate = document.querySelector("#comparecard");
+		var separatorTemplate = document.querySelector("#separator");
+
+		var testContainerDiv = document.getElementById("testcontainer");
+
+		var saveField = document.querySelector(".savefield");
+		var loadField = document.querySelector(".loadfield");
+
+
+		function updateOutput(){
+			var outString = JSON.stringify(state);
+			saveField.value = outString;
+		}
+
+		function updateAllTones(){
+
+			for(var t of tones)
+				t.updateColours();
+		}
+
+		updateOutput();
+
+		function load(){
+			state = JSON.parse(loadField.value);
+			updateOutput();
+			updateAllTones();
+		}
+
+
+		function maxChromaColour(h,L) {
+			var C = 150.0;
+			var step = 150.0;
+			var clipd = true;
+			var lch;
+			for(var i=0; i<10; i++){
+				step = step/2;
+				C = C + (clipd ? -step : step);
+
+				lch = chroma.lch(L,C,h);
+				clipd = lch.clipped();
+
+				
+
+			}
+			
+			if(clipd)
+				C -= step;
+			
+
+
+			return { 
+				maxC : C,
+				col : lch
+			}
+		}
+
+
+
+
+
+		class Tone{
+			constructor(cindex){
+				var div = toneTemplate.content.cloneNode(true);
+				this.sliderh0 = div.querySelector(".h0slider");
+				this.sliderh1 = div.querySelector(".h1slider");
+				var chipsContainer = div.querySelector(".chipscontainer");
+				this.title = div.querySelector(".tonetitle");
+				testContainerDiv.appendChild(div);
+
+				this.c = cindex;
+				this.h0 = state.h0[this.c];
+				this.h1 = state.h1[this.c];
+
+				this.sliderh0.value = this.h0;
+				this.sliderh1.value = this.h1;
+
+				this.chips = []
+
+				for(var relC in rel_chromas){
+					var chipRow = document.createElement("div");
+					chipRow.className = "chiprow";
+					chipsContainer.appendChild(chipRow);
+					for(var L in lumas){
+						var chip = document.createElement("div");
+						chip.className = "chip";
+						chipRow.appendChild(chip);
+						this.chips.push(chip);
+					}
+
+				}
+
+				this.updateColours();
+
+
+				this.sliderh0.addEventListener("input",this.update.bind(this));
+				this.sliderh1.addEventListener("input",this.update.bind(this));
+			}
+
+			update(){
+				this.h0 = this.sliderh0.valueAsNumber;
+				this.h1 = this.sliderh1.valueAsNumber;
+
+				state.h0[this.c] = this.h0;
+				state.h1[this.c] = this.h1;
+
+				updateOutput();
+
+				this.updateColours();
+			}
+
+			geth(L){
+				return this.h0 + this.h1 * (L-50);
+			}
+
+			updateColours(){
+				this.h0 = state.h0[this.c];
+				this.h1 = state.h1[this.c];
+
+				this.sliderh0.value = this.h0;
+				this.sliderh1.value = this.h1;
+
+				var k = 0;
+				for(var relC of rel_chromas)
+					for(var L of lumas){
+
+						var h = this.geth(L);
+
+						var maxout = maxChromaColour(h,L);
+						var col;
+						if( relC == 1){
+							col = maxout.col;
+						}
+						else
+						{
+							
+							col = chroma.lch(L,relC*maxout.maxC,h);
+						}
+
+
+
+						this.chips[k].style.backgroundColor = col.hex();
+
+						k++;
+					}
+
+					if(typeof this.toUpdate != "undefined")
+						this.toUpdate.update();
+
+					this.title.innerHTML = `${toneNames[this.c]} - h0 = ${this.h0}, h1 = ${this.h1}`;
+				}
+
+
+			}
+
+			class Compair{
+				constructor(){
+					var div = compairTemplate.content.cloneNode(true);
+					var cardsContainer = div.querySelector(".compairpanel");
+
+					this.cards = [];
+
+					for(var s of [false,true]){
+						var cardRow = document.createElement("div");
+						cardRow.className = "cardrow";
+						
+
+						for(var L of lumas_slit){
+							var card = compairCardTemplate.content.cloneNode(true);
+							card.bg  = card.querySelector(".cardbg");
+							card.slit  = card.querySelector(".cardslit");
+							cardRow.appendChild(card);
+							this.cards.push(card);
+						}
+						cardsContainer.appendChild(cardRow);
+
+					}
+
+					document.getElementById("testcontainer").appendChild(div);
+
+				}
+
+				bindToTones(t1,t2){
+					this.tones = [t1,t2];
+
+					t1.toUpdate = this;
+					t2.toUpdate = this;
+					this.update();
+				}
+
+				update(){
+					var k = 0;
+					for(var s of [false,true])
+						for(var L of lumas_slit){
+							var card = this.cards[k];
+
+							var col1 = maxChromaColour(this.tones[s?1:0].geth(L),L).col;
+							var col2 = maxChromaColour(this.tones[s?0:1].geth(L),L).col;
+
+
+
+							card.bg.style.backgroundColor = col1.hex();
+							card.slit.style.backgroundColor = col2.hex();
+
+
+							k++;
+						}
+					}
+				}
+
+
+
+
+
+
+				tones = []
+				pairs = []
+				for(var k = 0; k<6; k++){
+					var t1 = new Tone(k);
+					var pair = new Compair();
+					var t2 = new Tone(k+6);
+
+					pair.bindToTones(t1,t2);
+					pairs.push(pair);
+					tones.push(t1,t2);
+
+					testContainerDiv.appendChild(separator.content.cloneNode(true));
+				}
+			</script>
+
+		</body>
+		</html>
