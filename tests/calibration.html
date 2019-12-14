@@ -13,9 +13,14 @@
 			<p>Below is a simple setup for saving/loading progress and data. To "save", just copy the string of the left textfield somewhere. To "load", repaste your parameter string into the right textfield and click load. Be careful with using the Load button or with reloading/closing tab as there is no undo, and I won't put my hands in your cache.</p>
 		</div>
 		<div id="saveload">
+			<div class="saveloadcolumn">
 			<textarea value="" class="savefield saveloadfield" readonly></textarea>
+			<button onclick="copyToClipboard()">Copy to Clipboard</button>
+		</div>
+		<div class="saveloadcolumn">
 			<textarea value="" class="loadfield saveloadfield"></textarea>
 			<button onclick="load()">Load from string</button>
+		</div>
 		</div>
 
 	</div>
@@ -100,6 +105,10 @@
 			state = JSON.parse(loadField.value);
 			updateOutput();
 			updateAllTones();
+		}
+
+		function copyToClipboard(){
+			navigator.clipboard.writeText(saveField.value);
 		}
 
 
