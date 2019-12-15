@@ -66,15 +66,12 @@
 		var h1_start = [0,0,0,0,0,0,0,0,0,0,0,0];
 
 
-		var state = {
-			h0 : h0_start,
-			h1 : h1_start
-		}
+		var state = JSON.parse('{"h0":[45,57.75,83,97.5,122.25,137,170,263,307.75,318.75,18.5,37],"h1":[0,0,-0.06,0,-0.115,0.02,-0.11,0,-0.11,-0.035,-0.175,-0.255]}');
 		var tones;
 		var pairs;
 
 		const lumas = [5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90,95];
-		const lumas_slit = [20, 50, 80];
+		const lumas_slit = [20, 50, 65, 80];
 		const rel_chromas = [1,0.5];
 
 		var toneTemplate = document.querySelector("#tone");
