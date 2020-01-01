@@ -113,14 +113,15 @@
 			var C = Math.random()*maxChroma;
 
 
-			return FCLtoRGB(F,C,L);
+			return {fcl:[F,C,L],
+					hex:FCLtoRGB(F,C,L).hex()};
 		}
 
 		function newTest(){
 
 			ourCol = randomColour();
 
-			ourChipDiv.style.backgroundColor = ourCol.hex();
+			ourChipDiv.style.backgroundColor = ourCol.hex;
 
 			minT = -coolmaxC;
 			maxT = warmaxC;
@@ -135,7 +136,7 @@
 		function clickIdk(){
 
 			var datapoint = {
-				colour:ourCol.hex(),
+				colour:ourCol,
 				T: (maxT+minT)/2,
 				deltaT : (maxT-minT)/2
 				};
@@ -176,7 +177,7 @@
 				var chip = document.createElement("div");
 				chip.className = "chip";
 				sortedChipsRowDiv.appendChild(chip);
-				chip.style.backgroundColor = point.colour;
+				chip.style.backgroundColor = point.colour.hex;
 			}
 		}
 
