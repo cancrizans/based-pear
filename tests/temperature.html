@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>Artistic Colour Temperature (Warmth) Experiment</title>
+	<link rel="stylesheet" type="text/css" href="style.css">
+</head>
+<body>
+
+	<h1>Artistic Colour Temperature (Warmth) Experiment</h1>
+
+
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/chroma-js/2.0.6/chroma.min.js"></script>
+	<script src="https://cdn.jsdelivr.net/npm/everpolate@0.0.3/everpolate.browserified.min.js"></script>
+	<script type="text/javascript" src="../fletcher.js"></script>
+
+
+	<div id="preamble"> <div id="instructions"><p> This is a setup for acquiring
+	data on perceived or artistic colour temperature ("warmth"). You will have to
+	estimate the warmth of a random colour on the left by comparing with a
+	reference colour on the right which is taken from the RO->BG axis at a fixed luminance of L=57. As long as
+	you are able to confidently perceive a temperature difference, you click the
+	corresponding button. If you are unsure, that means we have reached accuracy
+	and you can press the "Can't tell anymore" button. This will add the current
+	colour and its estimate of average temperature and error to the data set. If
+	you suspect you made a mistake or are unable to figure out what's going on
+	with a particular colour, just press "Discard this" to get a new one without
+	saving to the data set. </p> <p> Just below, you have all colours you saved
+	in the dataset ordered from coolest to warmest, and then the data set in JSON
+	form. </p> </div> </div> <div id="testcontainerdarker">
+		
+		<div class="twochipwrapper">
+			<div id="ourchip" class="bigchip"></div>
+			<div id="refchip" class="bigchip"></div>
+		</div>
+
+		<div class="buttonsrow">
+		<button onclick="clickLeftCooler()">Left is cooler</button>
+		<button onclick="clickRightCooler()">Right is cooler</button>
+		<button onclick="clickIdk()">Can't tell anymore</button>
+		<button onclick="clickGiveUp()">Discard this</button>
+		</div>
+
+
+		<div id="sortedchipsrow" class="chiprow"> </div>
+		<div id="tempdataview">
+			
+		</div>
+
+		
+		<div class="separator"></div>
+		<div class="separator"></div>
+		<div class="separator"></div>
+		<div class="separator"></div>
+
+	</div>
+
+
+	<script type="text/javascript">
+		const referenceL = 57;
+
+		var minimums = maxChromaColourFL(0,referenceL);
+		var maximums = maxChromaColourFL(6,referenceL);
+
+		var warmaxC = minimums.maxC;
+		var coolmaxC = maximums.maxC;
+
+
+		function isTemperatureInRange(T){
+			return ((T>-coolmaxC) && (T<warmaxC));
+
+		}
+
+		function referenceTone(T){
+			if(!isTemperatureInRange(T))
+			{
+				console.log("error: out of range Temperature");
+				return null;
+			}
+
+			if (T>0)
+			{
+				return FCLtoRGB(0,T, referenceL );
+			}
+			else
+				return FCLtoRGB(6,-T,referenceL);
+		}
+
+		refChipDiv = document.querySelector("#refchip");
+		ourChipDiv = document.querySelector("#ourchip");
+		dataViewDiv = document.querySelector("#tempdataview");
+		sortedChipsRowDiv = document.querySelector("#sortedchipsrow");
+
+
+		var minT;
+		var maxT;
+		var refT;
+
+		var data = [];
+		var ourCol;
+
+		function updateRef(){
+			refT = (maxT+minT)/2.;
+			refChipDiv.style.backgroundColor = referenceTone(refT).hex();
+		}
+
+		function randomColour(){
+			var F = Math.random()*12;
+			var L = 10 + Math.random()*80;
+
+
+			var maxChroma = maxChromaColourFL(F,L).maxC;
+			var C = Math.random()*maxChroma;
+
+
+			return FCLtoRGB(F,C,L);
+		}
+
+		function newTest(){
+
+			ourCol = randomColour();
+
+			ourChipDiv.style.backgroundColor = ourCol.hex();
+
+			minT = -coolmaxC;
+			maxT = warmaxC;
+
+			updateRef();
+
+		}
+
+		newTest();
+
+
+		function clickIdk(){
+
+			var datapoint = {
+				colour:ourCol.hex(),
+				T: (maxT+minT)/2,
+				deltaT : (maxT-minT)/2
+				};
+
+			data.push(datapoint)
+
+			updateDataView();
+			updateSortedChips();
+
+			newTest();
+		}
+
+		function clickGiveUp(){
+			newTest();
+		}
+
+		function clickLeftCooler(){
+			maxT = refT;
+			updateRef();
+		}
+
+		function clickRightCooler(){
+			minT = refT;
+			updateRef();
+		}
+
+		function updateDataView(){
+			dataViewDiv.innerHTML = JSON.stringify(data);
+		}
+
+		function updateSortedChips(){
+			sortedChipsRowDiv.innerHTML = "";
+
+			dataSorted = data.slice();
+			dataSorted.sort(function(a,b){return a.T-b.T});
+
+			for (const point of dataSorted){
+				var chip = document.createElement("div");
+				chip.className = "chip";
+				sortedChipsRowDiv.appendChild(chip);
+				chip.style.backgroundColor = point.colour;
+			}
+		}
+
+
+	</script>
+</body>

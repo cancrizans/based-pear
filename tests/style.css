@@ -136,3 +136,45 @@ body {
   background: #111;
   cursor: pointer;
 }
+
+#testcontainerdarker {
+	background-color: #010101;
+	color: #eee;
+	padding: 30px;
+	margin: 0px;
+	padding-top: 100px; 
+}
+
+.bigchip {
+	width: 200px;
+	height: 200px;
+	
+	border-radius: 30px;
+	margin: 15px;
+
+	display: inline-block;
+}
+
+.twochipwrapper{
+	margin: 20px;
+	display: block;
+	text-align: center;
+}
+
+.buttonsrow button{
+	margin: ;
+	display: inline-block;
+}
+
+.buttonsrow {
+	margin:20px;
+	display: block;
+	text-align: center;
+	margin-bottom:30px;
+}
+
+#tempdataview{
+	color: 555;
+	margin:20px;
+	padding:10px;
+}
