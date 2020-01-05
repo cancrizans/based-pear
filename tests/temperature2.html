@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>Artistic Colour Temperature (Warmth) Experiment (Part II)</title>
+	<link rel="stylesheet" type="text/css" href="style.css">
+</head>
+<body>
+
+	<h1>Artistic Colour Temperature (Warmth) Experiment (Part II)</h1>
+
+
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/chroma-js/2.0.6/chroma.min.js"></script>
+	<script src="https://cdn.jsdelivr.net/npm/everpolate@0.0.3/everpolate.browserified.min.js"></script>
+	<script type="text/javascript" src="../fletcher.js"></script>
+	<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+
+
+	<div id="preamble"> <div id="instructions"><p>
+		The first test has verified the assumptions that warmth is proportional to chroma and essentially independent on luminance (for constant chromaticity). With that information, one can restrict to discussing simply the (relative) warmth of hues. The following test involves only colours at L=57, C=30 (plus neutral grey at L=57). It requires you to choose four colours using sliders for the hues: the warmest, the coolest, a neutral colour near yellow, and a neutral colour near violet. Pure grey is also presented for reference.
+	</p>
+	<p>
+		Based on that data, a model for colour temperature can be computed. Press the button "Update Model" to generate it based on the reference values you provided above. This will present a plot of relative warmth of hues and a scatter plot of colours horizontally positioned according to warmth. Ideally, colours aligned vertically should be isothermal (feel the same warmth).
+	</p>
+	 </div> </div>
+	<div id="testcontainerdarker">
+		
+		
+			<div id="warmestchip" class="bigchip"></div>
+			<div id="coolestchip" class="bigchip"></div>
+			<div id="neutralchip" class="bigchip"></div>
+			<div id="neutralupchip" class="bigchip"></div>
+			<div id="neutraldownchip" class="bigchip"></div>
+		
+			<input type="range" value="0" min="-1" max="2" step="0.005" class="slider h0slider" id="warmestslider">
+			<input type="range" value="6" min="5" max="8" step="0.005" class="slider h0slider" id="coolestslider">
+			<input type="range" value="3.385" min="2" max="5" step="0.005" class="slider h0slider" id="neutralupslider">
+			<input type="range" value="9" min="7" max="10" step="0.005" class="slider h0slider" id="neutraldownslider">
+
+
+		<div class="separator"></div>
+		
+			<button onclick="updateModel()">Update Model</button>
+
+
+		<div id="warmthplot" style="width:600px;height:250px; margin:30px"></div>
+		<canvas id="sprawlcanvas" width="640px" height="640px" style="margin: 30px;">
+			
+		</canvas>
+	</div>
+
+
+	<script type="text/javascript">
+		
+
+		const referenceL = 57;
+		const pim = Math.PI/2;
+
+ 		var linearinterp = everpolate.linear;
+
+		function getUniformChromaCol(F){
+			return FCLtoRGB(F,30,referenceL);
+		}
+
+
+		var chips = {
+			warmest : document.querySelector("#warmestchip"),
+			coolest : document.querySelector("#coolestchip"),
+			neutralup : document.querySelector("#neutralupchip"),
+			neutraldown : document.querySelector("#neutraldownchip")
+		};
+
+		neutralChip = document.querySelector("#neutralchip");
+		neutralChip.style.backgroundColor = FCLtoRGB(0,0,referenceL).hex();
+
+
+		var sliders = {
+			warmest : document.querySelector("#warmestslider"),
+			coolest : document.querySelector("#coolestslider"),
+			neutralup : document.querySelector("#neutralupslider"),
+			neutraldown : document.querySelector("#neutraldownslider")
+		}
+
+
+
+		var hues = {
+			warmest: 0,
+			coolest: 6.7,
+			neutralup: 3.385,
+			neutraldown: 9
+		};
+
+		
+		var plotDiv = document.querySelector("#warmthplot");
+		var sprawlCanvas = document.querySelector("#sprawlcanvas");
+		var ctx = sprawlCanvas.getContext("2d");
+
+
+		function sampleSliders(){
+			Object.keys(sliders).forEach(function(key,index){
+			hues[key] = sliders[key].valueAsNumber;
+			});
+		}
+
+
+
+
+
+		function updateChipsColour(){
+			Object.keys(hues).forEach(function(key,index) {
+				var chip = chips[key];
+				chip.style.backgroundColor = getUniformChromaCol(hues[key]).hex();
+			});
+		}
+
+
+
+		function update(){
+			
+			sampleSliders();
+			updateChipsColour();
+		}
+
+		updateChipsColour();
+
+		Object.keys(sliders).forEach(function(key,index){
+			
+			sliders[key].value = hues[key];
+			sliders[key].addEventListener("input",update);
+		});
+
+
+		var warmthAngle;
+
+		function generateModel(){
+			var dataF = [hues.neutraldown-12,hues.warmest,hues.neutralup,hues.coolest,hues.neutraldown,hues.warmest+12,hues.neutralup+12];
+			
+			console.log(dataF);
+
+			dataAng = [-pim,0,pim,2*pim,3*pim,4*pim,5*pim];
+
+			warmthAngle = function(F){
+				return linearinterp(F,dataF,dataAng)[0];
+			}
+
+		}
+
+		function warmth(F){
+			return Math.cos(warmthAngle(F));
+		}
+		function pearfulness(F){
+			return Math.sin(warmthAngle(F));
+		}
+
+
+		function updateModel(){
+
+
+			generateModel();
+
+
+			Fs = []
+			Ws = []
+			for(var F=0; F<12; F+=0.1){
+				Fs.push(F);
+				Ws.push(warmth(F));
+			}
+			
+			Plotly.purge(plotDiv);
+			Plotly.plot(plotDiv,[{x:Fs,y:Ws}]);
+
+			ctx.fillStyle = FCLtoRGB(0,0,referenceL).hex();
+			ctx.fillRect(0, 0, sprawlCanvas.width, sprawlCanvas.height);
+
+			for (var colourfulness = 0; colourfulness<1; colourfulness+= 0.05)
+			{
+				//var colourfulness = Math.tanh(C/40);
+				var C = 37*Math.atanh(colourfulness);
+
+				for(var F=0; F<12; F+=0.1/(colourfulness)){
+					var col = FCLtoRGB(F,C,referenceL);
+					if (col.clipped())
+						continue;
+					ctx.fillStyle = col.hex();
+					
+					var y = sprawlCanvas.height *(0.5 -pearfulness(F)* colourfulness/(2));
+					var x = sprawlCanvas.width * (warmth(F) * colourfulness / (2) + 0.5);
+					ctx.fillRect(x,y,20,20);
+				}
+			}
+		}
+
+		updateModel();
+
+	</script>
+
+</body>
