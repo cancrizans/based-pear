@@ -36,6 +36,11 @@ const toneCodes = ["RO","O","OY","Y","YG","G","BG","B","BV","V","VR","R"];
 
 
 
+ 			interpolant0 = createInterpolant(Fvals,h0);
+ 			interpolant1 = createInterpolant(Fvals,h1);
+
+ 			inverseinterpolant0 = createInterpolant(h0,Fvals);
+
 
  			var linearinterp = everpolate.linear;
 
@@ -48,14 +53,27 @@ const toneCodes = ["RO","O","OY","Y","YG","G","BG","B","BV","V","VR","R"];
  			}
 
  			function Ftoh(F,L){
- 				return linearinterp(F,Fvals,hdata(L));
+ 				//return linearinterp(F,Fvals,hdata(L));
+ 				return mod(interpolant0(F) + (L-50)*interpolant1(F),360);
  			}
+
+
  			function htoF(h,L){
- 				var out = linearinterp(h,hdata(L),Fvals)%12;
- 				if(out < 0)
- 					out+=12;
- 				return out;
+ 				//var out = linearinterp(h,hdata(L),Fvals)%12;
+ 				//if(out < 0)
+ 				//	out+=12;
+ 				var F = inverseinterpolant0(h);
+
+ 				for(var k=0; k<=20; k++){
+ 					F += 0.01 * (h-Ftoh(F,L));
+ 				}
+
+ 				
+
+ 				return mod(F,12);
  			}
+
+
 
 
 
@@ -102,6 +120,11 @@ const toneCodes = ["RO","O","OY","Y","YG","G","BG","B","BV","V","VR","R"];
 
  			}
 
+ 			function xyLtoRGB(xyL){
+ 				var FC = xytoFC(xyL.x,xyL.y);
+ 				return FCLtoRGB(FC.F,FC.C,xyL.L);
+ 			}
+
 
 
 		function maxChromaColourFL(F,L) {
@@ -131,3 +154,5 @@ const toneCodes = ["RO","O","OY","Y","YG","G","BG","B","BV","V","VR","R"];
 				col : colour
 			}
 		}
+
+

@@ -12,6 +12,7 @@
 
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/chroma-js/2.0.6/chroma.min.js"></script>
 	<script src="https://cdn.jsdelivr.net/npm/everpolate@0.0.3/everpolate.browserified.min.js"></script>
+	<script type="text/javascript" src="../scripts/MonotoneCubic.js"></script>
 	<script type="text/javascript" src="../fletcher.js"></script>
 	<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 
@@ -38,17 +39,30 @@
 			<input type="range" value="9" min="7" max="10" step="0.005" class="slider h0slider" id="neutraldownslider">
 
 
+		<div id="extraparams"></div>
+		<input type="range" value="0" min="0" max="0.5" step="0.005" class="slider h0slider" id="squishleftslider">
+		<input type="range" value="0" min="0" max="0.5" step="0.005" class="slider h0slider" id="squishpurpleslider">
+		<input type="range" value="0" min="0" max="0.5" step="0.005" class="slider h0slider" id="boostleftslider">
+
 		<div class="separator"></div>
 		
 			<button onclick="updateModel()">Update Model</button>
 
 
-		<div id="warmthplot" style="width:600px;height:250px; margin:30px"></div>
+		<div id="warmthplot" style="width:600px;height:500px; margin:30px"></div>
 		<canvas id="sprawlcanvas" width="640px" height="640px" style="margin: 30px;">
 			
 		</canvas>
+		<div id="isotherms" style="width: 800px; height:800px;margin:20px"></div>
+	
+		<div class="separator"></div>
+		<button onclick="generateCLUT()">Generate CLUT</button>
+
+		<canvas id="CLUTcanvas"></canvas>
+		<a id="CLUTimagedata">CLUT dataURL</a>
 	</div>
 
+	
 
 	<script type="text/javascript">
 		
@@ -78,28 +92,45 @@
 			warmest : document.querySelector("#warmestslider"),
 			coolest : document.querySelector("#coolestslider"),
 			neutralup : document.querySelector("#neutralupslider"),
-			neutraldown : document.querySelector("#neutraldownslider")
+			neutraldown : document.querySelector("#neutraldownslider"),
+			squishleft : document.querySelector("#squishleftslider"),
+			squishpurple : document.querySelector("#squishpurpleslider"),
+			boostleft :  document.querySelector("#boostleftslider")
 		}
 
 
 
 		var hues = {
 			warmest: 0,
-			coolest: 6.7,
+			coolest: 6.55,
 			neutralup: 3.385,
 			neutraldown: 9
 		};
+
+		var squishLeft = 0.245;
+		var squishPurple = 0.175;
+		var boostLeft = 0.3;
 
 		
 		var plotDiv = document.querySelector("#warmthplot");
 		var sprawlCanvas = document.querySelector("#sprawlcanvas");
 		var ctx = sprawlCanvas.getContext("2d");
+		var isothermsDiv = document.querySelector("#isotherms");
+
+		var CLUTCanvas = document.querySelector("#CLUTcanvas");
+		var CLUTctx = CLUTcanvas.getContext("2d");
+
+		var extraParamsDiv = document.querySelector("#extraparams");
 
 
 		function sampleSliders(){
-			Object.keys(sliders).forEach(function(key,index){
+			Object.keys(hues).forEach(function(key,index){
 			hues[key] = sliders[key].valueAsNumber;
 			});
+			
+			squishLeft = sliders.squishleft.valueAsNumber;
+			squishPurple = sliders.squishpurple.valueAsNumber;
+			boostLeft = sliders.boostleft.valueAsNumber;
 		}
 
 
@@ -119,39 +150,64 @@
 			
 			sampleSliders();
 			updateChipsColour();
+
+			extraParamsDiv.innerHTML = `squish G: ${squishLeft}, squish V: ${squishPurple}, boost: ${boostLeft}.`;
 		}
 
 		updateChipsColour();
 
-		Object.keys(sliders).forEach(function(key,index){
+		Object.keys(hues).forEach(function(key,index){
 			
 			sliders[key].value = hues[key];
+
+		});
+		Object.keys(sliders).forEach(function(key,index){
 			sliders[key].addEventListener("input",update);
 		});
 
+		sliders.squishleft.value = squishLeft;
+		sliders.boostleft.value = boostLeft;
 
 		var warmthAngle;
 
 		function generateModel(){
 			var dataF = [hues.neutraldown-12,hues.warmest,hues.neutralup,hues.coolest,hues.neutraldown,hues.warmest+12,hues.neutralup+12];
 			
-			console.log(dataF);
+			//console.log(squishLeft);
 
 			dataAng = [-pim,0,pim,2*pim,3*pim,4*pim,5*pim];
 
 			warmthAngle = function(F){
-				return linearinterp(F,dataF,dataAng)[0];
+				var out = linearinterp(F,dataF,dataAng)[0];
+				var s = Math.sin(out);
+				var c = Math.cos(out);
+				var squish =  Math.sin(2*out)*( (c<0 && s>0 ?squishLeft:0) +  (c<0 && s<0 ? squishPurple : 0));
+				return out + squish;
 			}
 
 		}
 
-		function warmth(F){
-			return Math.cos(warmthAngle(F));
+		function hueWarmth(F){
+			var naked = Math.cos(warmthAngle(F));
+			return naked - boostLeft * Math.exp(- (naked+1)/0.05 );
 		}
 		function pearfulness(F){
 			return Math.sin(warmthAngle(F));
 		}
 
+		const Cstar = 50;
+
+		function thermality(C){
+			return Math.tanh(C/Cstar)
+		}
+
+		function inverseThermality(th){
+			return Cstar * Math.atanh(th);
+		}
+
+		function warmth(F,C){
+			return hueWarmth(F)*thermality(C);
+		}
 
 		function updateModel(){
 
@@ -163,7 +219,7 @@
 			Ws = []
 			for(var F=0; F<12; F+=0.1){
 				Fs.push(F);
-				Ws.push(warmth(F));
+				Ws.push(hueWarmth(F));
 			}
 			
 			Plotly.purge(plotDiv);
@@ -172,25 +228,136 @@
 			ctx.fillStyle = FCLtoRGB(0,0,referenceL).hex();
 			ctx.fillRect(0, 0, sprawlCanvas.width, sprawlCanvas.height);
 
-			for (var colourfulness = 0; colourfulness<1; colourfulness+= 0.05)
+			for (var colourfulness = 0; colourfulness<=1; colourfulness+= 0.05)
 			{
 				//var colourfulness = Math.tanh(C/40);
-				var C = 37*Math.atanh(colourfulness);
+				var C = inverseThermality(colourfulness);
 
-				for(var F=0; F<12; F+=0.1/(colourfulness)){
+				for(var F=0; F<12; F+=0.1/(colourfulness)*(Math.abs(F-6.35)<2?0.3:1)){
 					var col = FCLtoRGB(F,C,referenceL);
 					if (col.clipped())
 						continue;
 					ctx.fillStyle = col.hex();
 					
 					var y = sprawlCanvas.height *(0.5 -pearfulness(F)* colourfulness/(2));
-					var x = sprawlCanvas.width * (warmth(F) * colourfulness / (2) + 0.5);
+					var x = sprawlCanvas.width * (-hueWarmth(F) * colourfulness / (2) + 0.5);
 					ctx.fillRect(x,y,20,20);
 				}
 			}
+
+			Plotly.purge(isothermsDiv);
+			var zs = [];
+			for(var y=-100;y<100; y+=10){
+				var row = [];
+				for (var x=-100;x<100; x+=10){
+					var FC = xytoFC(-x,-y);
+					row.push(warmth(FC.F,FC.C));
+				}
+				zs.push(row);
+			}
+			console.log(zs);
+			countourPlotData = [{
+				z : zs,
+				type : 'contour',
+				contours : {
+					coloring : 'lines',
+					start:-1.7,
+					end: 2,
+					size: 0.04
+				},
+				colorscale: [[0, 'rgb(255,255,255)'],[1, 'rgb(255,255,255)']],
+				showlabels: true,
+				labelfont: {
+					family: 'Raleway',
+					size: 12,
+					color: 'white',
+				},
+
+			}];
+			imagesData = {
+				images: [
+				{
+					x: 0,
+					y: 0,
+					sizex: 20,
+					sizey: 20,
+					source: "https://i.imgur.com/u452XEH.png",
+					xanchor: "left",
+					xref: "x",
+					yanchor: "bottom",
+					yref: "y",
+					layer: "below"
+				}
+				],
+
+				xaxis: {
+					showgrid : false				
+				},
+				yaxis : {showgrid:false}
+			}
+			Plotly.plot(isothermsDiv,countourPlotData,imagesData);
+
+
 		}
 
 		updateModel();
+
+
+		function generateCLUT(){
+			var topRO = maxChromaColourFL(hues.warmest,referenceL);
+			var maxw = warmth(hues.warmest,topRO.maxC);
+			var topBG = maxChromaColourFL(hues.coolest,referenceL);
+			var minw = warmth(hues.coolest,topBG.maxC);
+
+
+			updateModel();
+			var CLUTlevel = 8;
+			var CLUTres = CLUTlevel*CLUTlevel; // cube side
+			var CLUTsize = CLUTlevel*CLUTlevel*CLUTlevel; //image side
+			
+			var step = 256/CLUTres;
+			var buffer = new Uint8ClampedArray(CLUTsize*CLUTsize * 4);
+			var i = 0;
+			for (var b=0; b<256; b+= step)
+				for (var g=0; g<256; g+= step)
+					for (var r=0; r<256; r+= step)
+					{
+						var col = RGBtoFCL(r/256.,g/256.,b/256.);
+						var w = Math.max(minw,Math.min(maxw,warmth(col.F,col.C)));
+						var Fs = w>0 ? hues.warmest : hues.coolest;
+
+						var normw = w/hueWarmth(Fs);
+
+						//var C = w>0 ? Math.pow(w/maxw,3) * topRO.maxC : w/minw * topBG.maxC;
+						var C = inverseThermality(normw);
+
+						var outcol = FCLtoRGB(Fs,C,referenceL).rgb();
+
+
+
+						buffer[i] = outcol[0];
+						buffer[i+1] = outcol[1];
+						buffer[i+2] = outcol[2];
+
+		
+						buffer[i+3] = 255;
+						i+=4;
+					}
+
+				
+			
+
+
+
+			CLUTcanvas.width = CLUTsize;
+			CLUTcanvas.height = CLUTsize;
+			var idata = CLUTctx.createImageData(CLUTsize,CLUTsize);
+			idata.data.set(buffer);
+			
+			CLUTctx.putImageData(idata,0,0);
+
+			document.querySelector("#CLUTimagedata").href = CLUTcanvas.toDataURL();
+		}
 
 	</script>
 

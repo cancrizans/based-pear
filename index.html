@@ -23,6 +23,21 @@
 			</ul>				
 		</div>
 		<div id="panel">
+			<div id="panelscale">
+				<div id="valuetonescale" class="tonescale">
+				</div>
+				<div class="equalcols">
+					<div class="column">
+						<div>Colour Wheel</div><input type="checkbox" id="wheelcheckbox" onclick="wheelCheckboxChecked()">
+						<div class="slidercontainer">
+  								<input type="range" min="0" max="100" value="57" step="0.5" id="wheelLslider">
+						</div>
+					</div>
+					<div class="column">
+						<div>Display Slices</div> <input type="checkbox" id="slicescheckbox" onclick="slicesCheckboxChecked()">
+					</div>
+				</div>
+			</div>
 			<div id="panelcolours">
 				<template id="nodeinspectortemplate">
 					<div class="nodeinspector">
@@ -42,6 +57,8 @@
 					<div class="rampinspector">
 						<div class="inspectorramprect">
 						</div>
+						<div class="tonescale">
+						</div>
 						<div class="slidercontainer">
   							<input type="range" min="-0.5" max="1" value="0" step="0.005" class="lambdaslider">
 						</div>
@@ -53,6 +70,7 @@
 					</div>
 				</template>
 			</div>
+
 		</div>
 		<script src="scripts/three.min.js"></script>
 		<script src="scripts/DragControls.js"></script>
@@ -67,6 +85,7 @@
 		  <script src="https://cdnjs.cloudflare.com/ajax/libs/chroma-js/2.0.6/chroma.min.js"></script>
 
 		  <script src="https://cdn.jsdelivr.net/npm/everpolate@0.0.3/everpolate.browserified.min.js"></script>
+		  <script type="text/javascript" src="scripts/MonotoneCubic.js"></script>
 		  <script type="text/javascript" src="fletcher.js"></script>
 		  <script src="scripts/ntc.js"></script>
 		<script>
@@ -324,11 +343,6 @@
 			var testpos = xyLtopos(testxy.x,testxy.y,testfcl.L);
 			var testbackrgb = FCLtoRGB(testfcl.F,testfcl.C,testfcl.L);
 
-			console.log(testfcl);
-			console.log(testxy);
-			console.log(testpos);
-			console.log(testbackrgb);
-
 
 
 			class Node{
@@ -436,9 +450,6 @@
 				kill(){
 					this.onColourUpdatedListeners.forEach(lisner => lisner.kill());
 				}
-
-
-				
 			}
 
 
@@ -604,6 +615,8 @@
 					this.lambdaSlider = this.inspectorDiv.querySelector(".lambdaslider");
 					this.muSlider = this.inspectorDiv.querySelector(".muslider");
 					this.rectDiv = this.inspectorDiv.querySelector(".inspectorramprect");
+					this.toneScaleDiv = this.inspectorDiv.querySelector(".tonescale");
+					this.toneScale = new ToneScale(this.toneScaleDiv);
 					this.deleteA = this.inspectorDiv.querySelector(".inspectordelete");
 
 					this.inspectorDiv = document.getElementById("panelramps").appendChild(this.inspectorDiv);
@@ -633,7 +646,7 @@
 				}
 
 
-				getxyL(t,tL){
+				getxyLraw(t,tL){
 					var out = {};
 					out.L = this.n2.L * tL +  this.n1.L * (1-tL);
 					out.x = this.n2.x * t +  this.n1.x * (1-t);
@@ -641,14 +654,54 @@
 					return out;
 				}
 
+				getxyL(t){
+					var tL = t - this.mu * (t*t-t);
+					var t2 = 4*(t-t*t);
+					var xyLraw = this.getxyLraw(t,tL);
+					var out = {}
+					out.x = xyLraw.x - this.lambda * this.midxyL.x * t2;
+					out.y = xyLraw.y - this.lambda * this.midxyL.y * t2;
+					out.L = xyLraw.L;
+					return out;
+				}
+
+
+				getSlice(L){
+					var Lm = Math.min(this.n1.L,this.n2.L);
+					var LM = Math.max(this.n1.L,this.n2.L);
+					var s = this.n2.L>this.n1.L ? 1: -1;
+
+					if(L<Lm || L > LM)
+						return null;
+
+					//initial guess
+					var t = (L -this.n1.L)/(this.n2.L-this.n1.L);
+
+					for(var k=0;k<8; k++){
+						t -= 0.01 * s * (this.getxyL(t).L-L);
+						//t = Math.max(0,Math.min(1,t));
+					}
+
+					var out = this.getxyL(t);
+					
+					if(t<0 || t>1)
+						console.log(t);
+
+					return out;
+
+
+				}
+
+
+
 
 
 				update() {
 					this.lambda = this.lambdaSlider.value;
 					this.mu = this.muSlider.value;
-					var maxblowup = Math.exp(-this.lambda);
+					//this.maxblowup = Math.exp(-this.lambda);
 
-					var midxyL = this.getxyL(0.5,0.5);
+					this.midxyL = this.getxyLraw(0.5,0.5);
 
 					var positions = [];
 					var colours = [];
@@ -656,21 +709,16 @@
 					for(var k=0;k<this.N;k++){
 						var t = 1.0 / (this.N-1) * k;
 
-						var t2 = 4*(t-t*t);
-						var blowup = (1-t2)+t2*maxblowup;
+						
+						//var blowup = (1-t2)+t2*this.maxblowup;
 
-						var tL = t - this.mu * (t*t-t);
+						var xyL = this.getxyL(t);
+						
 
-						var xyLraw = this.getxyL(t,tL);
+						var pos = xyLtopos(xyL.x,xyL.y,xyL.L);
 
-						var x = xyLraw.x - this.lambda * midxyL.x * t2;
-						var y = xyLraw.y - this.lambda * midxyL.y * t2;
-						var L = xyLraw.L;
-
-						var pos = xyLtopos(x,y,L);
-
-						var FC = xytoFC(x,y);
-						var col = FCLtoRGB(FC.F,FC.C,L);
+						var FC = xytoFC(xyL.x,xyL.y);
+						var col = FCLtoRGB(FC.F,FC.C,xyL.L);
 						
 
 						if(col.clipped())
@@ -688,6 +736,22 @@
 					this.line.geometry.setPositions(positions);
 					this.line.geometry.setColors(colours);
 					this.rectDiv.style.backgroundImage = "linear-gradient(to right,"+ hexes.join(',') + ")";
+
+					this.toneScale.tones = [];
+					for (let L of valueScale){
+						var sl = this.getSlice(L);
+						if(sl == null)
+							continue;
+
+						var col = xyLtoRGB(sl);
+						this.toneScale.tones.push(col.hex());
+					}
+					
+
+					this.toneScale.rebuild();
+
+
+					
 				}
 
 				onColourUpdated(){
@@ -703,6 +767,155 @@
 			}
 
 
+			var colourWheelMaterial = new THREE.MeshBasicMaterial({vertexColors:THREE.VertexColors,side:THREE.DoubleSide});
+
+			class LumaSlice{
+				constructor(L){
+					
+					this.L=L;
+					this.geometry = new THREE.Geometry();
+					for (var F = 0; F<12; F+=0.25){
+						var maxC = maxChromaColourFL(F,this.L).maxC;
+						
+						var xy = FCtoxy(F,maxC);
+						var pos = xyLtopos(xy.x,xy.y,L);
+						this.geometry.vertices.push(pos);
+					};
+					this.geometry.vertices.push(this.geometry.vertices[0]);
+					
+					this.line = new THREE.Line(this.geometry,gridSolidMaterial);
+					scene.add(this.line);
+
+					this.line.visible = false;
+
+					this.wheel = null;
+				}
+
+
+
+				generateWheelGeometry(){
+					if(this.wheel == null){
+
+						this.wheelGeom = new THREE.BufferGeometry();
+						this.Nrays = 12*4;
+						this.Ncircles = 4;
+						this.Nvertices = 1 + this.Ncircles*this.Nrays;
+						this.Ncomponents = this.Nvertices*3;
+
+						var indices = [];
+
+						for (var c=1; c<=this.Ncircles; c++){
+							var head = (c-1) * this.Nrays+1;
+							var phead = (c-2)*this.Nrays+1;
+							for(var i=0; i<this.Nrays; i++){
+								if(c==1)
+									indices.push(0,head +(i+1)%this.Nrays,head + i);
+								else
+								{
+									indices.push( head + i, phead+i, head +(i+1)%this.Nrays);
+									indices.push(phead+i, phead+(i+1)%this.Nrays, head +(i+1)%this.Nrays);
+								}
+							}
+						}
+
+						this.wheelGeom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(this.Ncomponents),3));
+						this.wheelGeom.setAttribute('color', new THREE.BufferAttribute(new Float32Array(this.Ncomponents),3));
+						this.wheelGeom.setIndex(indices);
+
+						this.wheel = new THREE.Mesh(this.wheelGeom,colourWheelMaterial);
+
+						scene.add(this.wheel);
+
+					}
+				}
+
+				updateWheel(){
+					this.generateWheelGeometry();
+					
+					var p = this.wheel.geometry.attributes.position.array;
+					var col = this.wheel.geometry.attributes.color.array;
+					p[0] = 0;
+					p[1] = 0;
+					var thez = xyLtopos(0,0,this.L).z;
+					for(var i=0; i<this.Nvertices;i++)
+						p[3*i+2] = thez;
+
+					var grey = FCLtoRGB(0,0,this.L).gl();
+					col[0] = grey[0];
+					col[1] = grey[1];
+					col[2] = grey[2];
+
+					for(var i=0; i<this.Nrays; i++){
+						var F = 12.0 * i / this.Nrays;
+						var topC = maxChromaColourFL(F,this.L).maxC;
+						for(var c=1; c<=this.Ncircles; c++){
+							var C = topC * c/(1.0 * this.Ncircles);
+							
+							var xy = FCtoxy(F,C);
+							var pos = xyLtopos(xy.x,xy.y,this.L);
+
+							var gl = FCLtoRGB(F,C,this.L).gl();
+
+							var th = 2*Math.PI / this.Nrays *i;
+							var head = 3*(1+i+this.Nrays*(c-1)); 
+							p[head] = pos.x;
+							p[head + 1] = pos.y;
+							//p[head + 2] = pos.z;
+							col[head] = gl[0];
+							col[head+1] = gl[1];
+							col[head+2] = gl[2];
+
+						}
+					}
+
+					this.wheel.geometry.attributes.position.needsUpdate = true;
+					this.wheel.geometry.attributes.color.needsUpdate = true;
+					
+				}
+			}
+
+			class ToneScale{
+				constructor(div){
+					this.div = div;
+					this.tones = [];
+					this.tonesDivs = [];
+				}
+
+				rebuild(){
+					while(this.tonesDivs.length>this.tones.length){
+						var last = this.tonesDivs.pop();
+						last.remove();
+
+					}
+
+					while(this.tonesDivs.length<this.tones.length){
+						var newDiv = document.createElement("div");
+						newDiv.setAttribute('class','tonescaletone');
+						this.div.appendChild(newDiv);
+						this.tonesDivs.push(newDiv);
+					}
+
+					for(var i=0; i<this.tones.length; i++){
+						this.tonesDivs[i].style.backgroundColor = this.tones[i];
+					}
+				}
+			}
+
+
+			var valueScale = [10,20,30,40,50,60,70,80,90];
+
+			var valueToneScaleDiv = document.querySelector("#valuetonescale");
+			var valueToneScale = new ToneScale(valueToneScaleDiv);
+			valueToneScale.tones = valueScale.map(L => FCLtoRGB(0,0,L).hex());
+			valueToneScale.rebuild();
+
+			lumaSlices = [];
+			for(var luma of valueScale){
+			 	lumaSlices.push(new LumaSlice(luma));				
+			 }
+
+			var wheelSlice = new LumaSlice(57);
+			//wheelSlice.updateWheel();
 
 
 			//Node selection
@@ -769,6 +982,32 @@
 				}
 			}
 
+
+			var cb = document.querySelector("#wheelcheckbox");
+			cb.checked = false;
+			function wheelCheckboxChecked(){
+				
+				if (cb.checked){
+					wheelSlice.updateWheel();
+					wheelSlice.wheel.visible = true;
+				}
+				else
+					wheelSlice.wheel.visible = false;
+			}
+
+			var wheelLSlider = document.querySelector("#wheelLslider");
+			wheelLslider.addEventListener("change",function(){
+				wheelSlice.L = wheelLSlider.valueAsNumber;
+				cb.checked = true;
+				wheelCheckboxChecked();
+			});
+
+			function slicesCheckboxChecked(){
+				var ch = document.querySelector("#slicescheckbox").checked;
+				for(sl of lumaSlices){
+					sl.line.visible = ch;
+				}
+			}
 
 
 

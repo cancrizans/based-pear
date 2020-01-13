@@ -101,3 +101,24 @@ canvas {
 .slidercontainer{
 	width:100%;
 }
+
+
+.tonescale{
+	display: flex;
+	flex-direction: row;
+	height: 50px;
+}
+
+.tonescaletone{
+	flex-grow: 1;
+	height: 100%;
+}
+
+.equalcols{
+	display: flex;
+	flex-direction: row;
+}
+
+.column{
+	flex-grow: 1;
+}
