@@ -569,6 +569,8 @@
 					scene.add(this.outline);
 
 					this.deleteA.remove();
+
+					this.onColourUpdated();
 				}
 
 				onColourUpdated() {
@@ -773,31 +775,42 @@
 				constructor(L){
 					
 					this.L=L;
-					this.geometry = new THREE.Geometry();
-					for (var F = 0; F<12; F+=0.25){
-						var maxC = maxChromaColourFL(F,this.L).maxC;
-						
-						var xy = FCtoxy(F,maxC);
-						var pos = xyLtopos(xy.x,xy.y,L);
-						this.geometry.vertices.push(pos);
-					};
-					this.geometry.vertices.push(this.geometry.vertices[0]);
-					
-					this.line = new THREE.Line(this.geometry,gridSolidMaterial);
+					this.lineGeom = new THREE.Geometry();
+
+
+					this.line = new THREE.Line(this.lineGeom,gridSolidMaterial);
+					this.lineGeom = this.line.geometry;
+
 					scene.add(this.line);
 
 					this.line.visible = false;
+
+					this.updateLine();
 
 					this.wheel = null;
 				}
 
 
+				updateLine(){
+
+					this.lineGeom.vertices = [];
+					for (var F = 0; F<12; F+=12 / 48.){
+						var maxC = maxChromaColourFL(F,this.L).maxC;
+						
+						var xy = FCtoxy(F,maxC);
+						var pos = xyLtopos(xy.x,xy.y,this.L);
+						this.lineGeom.vertices.push(pos);
+					};
+					this.lineGeom.vertices.push(this.lineGeom.vertices[0]);
+					this.lineGeom.verticesNeedUpdate = true;
+					
+				}
 
 				generateWheelGeometry(){
 					if(this.wheel == null){
 
 						this.wheelGeom = new THREE.BufferGeometry();
-						this.Nrays = 12*4;
+						this.Nrays = 12*8;
 						this.Ncircles = 4;
 						this.Nvertices = 1 + this.Ncircles*this.Nrays;
 						this.Ncomponents = this.Nvertices*3;
@@ -902,7 +915,7 @@
 			}
 
 
-			var valueScale = [10,20,30,40,50,60,70,80,90];
+			var valueScale = [6,12,18,25,31,37,43,50,56,63,69,75,81,88,94];
 
 			var valueToneScaleDiv = document.querySelector("#valuetonescale");
 			var valueToneScale = new ToneScale(valueToneScaleDiv);
@@ -946,7 +959,7 @@
 			}
 
 
-			var gnode = new WhitePointNode(50,0,0);
+			var gnode = new WhitePointNode(30,0,0);
 
 
 
@@ -1000,7 +1013,15 @@
 				wheelSlice.L = wheelLSlider.valueAsNumber;
 				cb.checked = true;
 				wheelCheckboxChecked();
+				wheelSlice.line.visible = false;
 			});
+			wheelLSlider.addEventListener("input",function(){
+				wheelSlice.L = wheelLSlider.valueAsNumber;
+				wheelSlice.line.visible = true;
+				wheelSlice.updateLine();
+			});
+
+
 
 			function slicesCheckboxChecked(){
 				var ch = document.querySelector("#slicescheckbox").checked;
