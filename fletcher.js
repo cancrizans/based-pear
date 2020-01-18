@@ -74,6 +74,13 @@ const toneCodes = ["RO","O","OY","Y","YG","G","BG","B","BV","V","VR","R"];
  			}
 
 
+ 			const boostExponentConstant = Math.pow(Math.PI/6,2)/(2*0.05);
+ 			const boostAmount = 0.3;
+ 			const boostCenter = 6.7;
+
+ 			function blueGreenBoost(F){
+ 				return 1+Math.exp(- boostExponentConstant * (F-boostCenter)*(F-boostCenter) );
+ 			}
 
 
 
@@ -106,16 +113,18 @@ const toneCodes = ["RO","O","OY","Y","YG","G","BG","B","BV","V","VR","R"];
  			}
 
  			function FCLtoRGB(F,C,L) {
- 				h = Ftoh(F,L);
- 				return chroma.lch(L,C,h)
+ 				var h = Ftoh(F,L);
+ 				var Craw = C /blueGreenBoost(F);
+ 				return chroma.lch(L,Craw,h)
  			}
 
  			function RGBtoFCL(r,g,b){
  				var lch = chroma.gl(r,g,b).lch();
  				var out = {};
  				out.L = lch[0];
- 				out.C = lch[1];
+ 				var Craw = lch[1];
  				out.F = htoF(lch[2],lch[0]);
+ 				out.C = Craw * blueGreenBoost(F);
  				return out;
 
  			}

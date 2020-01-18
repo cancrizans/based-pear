@@ -94,6 +94,8 @@
 			var nodeInspectorTemplate = document.querySelector("#nodeinspectortemplate");
 			var rampInspectorTemplate = document.querySelector("#rampinspectortemplate");
 
+			var instructionsDiv = document.querySelector("#info");
+
 
 			const frustumSize = 2;
 
@@ -206,6 +208,10 @@
             	gapSize: 0.01,
             } );
 			
+
+
+			var textColorLabels = [];
+
             function createGrid(gridMaterial,doText){
 				var whitePointGrid = new THREE.Object3D();
 				whitePointGrid.position.set(0,0,0);
@@ -215,21 +221,24 @@
 
 				var geometryAxes = new THREE.Geometry();
 
-				var k;
-				for (k=0; k<12; k++)
+
+				for (var k=0; k<12; k++)
 				{
 					var theta = -2* Math.PI * k / 12.0;
 					geometryAxes.vertices.push(new THREE.Vector3(-Math.cos(theta),-Math.sin(theta),0));
 					geometryAxes.vertices.push(new THREE.Vector3(Math.cos(theta),Math.sin(theta),0));
 
 					if(doText){
-					var clabel = new SpriteText(toneCodes[k],0.03);
-					clabel.color ='white';
-					clabel.position.set(Math.cos(theta),Math.sin(theta),0);
-					clabel.position.multiplyScalar(1.1);
-					clabel.material.sizeAttenuation=false;
-					whitePointGrid.add(clabel);
+						var clabel = new SpriteText(toneCodes[k],0.03);
+						clabel.color ='white';
+						clabel.position.set(Math.cos(theta),Math.sin(theta),0);
+						clabel.position.multiplyScalar(1.1);
+						clabel.material.sizeAttenuation=false;
+						whitePointGrid.add(clabel);
+						textColorLabels.push(clabel);
 					}
+
+
 				}
 
 				var nlabel = new SpriteText("N",0.03);
@@ -237,6 +246,7 @@
 				nlabel.position.set(0,0,0);
 				nlabel.material.sizeAttenuation = false;
 				scene.add(nlabel);
+				textColorLabels.push(nlabel);
 
 				var Axes = new THREE.LineSegments(geometryAxes, gridMaterial);
 				Axes.computeLineDistances();
@@ -571,6 +581,8 @@
 					this.deleteA.remove();
 
 					this.onColourUpdated();
+
+					this.isLight = false;
 				}
 
 				onColourUpdated() {
@@ -581,7 +593,22 @@
 						this.outline.position.copy(this.box.position);
 
 					}
+
+					if(this.isLight != (this.L>55)){
+						this.isLight = (this.L>55);
+						var col = this.isLight? 0x000000 : 0xffffff;
+						gridSolidMaterial.color.set(col);
+						gridDashedMaterial.color.set(col);
+						var col2 = this.isLight? 'black' : 'white';
+						for(var l of textColorLabels){
+							l.color = col2;
+							l._genCanvas();
+						}
+						instructionsDiv.style.color = col2;
+					}
 				}
+
+
 			}
 
 
