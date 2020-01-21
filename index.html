@@ -20,9 +20,17 @@
 				<li>T (hold): lock hue</li>
 				<li>N: add new node</li>
 				<li>B: add ramp between last two clicked nodes</li>
+				<li>Ctrl+Z: undo</li>
+				<li>Ctrl+Y: redo</li>
 			</ul>				
 		</div>
 		<div id="panel">
+			<div id="toolbar">
+				<button onclick="us.undo()">undo</button>
+				<button onclick="us.redo()">redo</button>
+				<button onclick="addNewNode()">add node</button>
+				<button onclick="addNewRamp()">add ramp</button>
+			</div>
 			<div id="panelscale">
 				<div id="valuetonescale" class="tonescale">
 				</div>
@@ -87,6 +95,7 @@
 		  <script src="https://cdn.jsdelivr.net/npm/everpolate@0.0.3/everpolate.browserified.min.js"></script>
 		  <script type="text/javascript" src="scripts/MonotoneCubic.js"></script>
 		  <script type="text/javascript" src="fletcher.js"></script>
+		  <script type="text/javascript" src="undo.js"></script>
 		  <script src="scripts/ntc.js"></script>
 		<script>
 
@@ -95,6 +104,8 @@
 			var rampInspectorTemplate = document.querySelector("#rampinspectortemplate");
 
 			var instructionsDiv = document.querySelector("#info");
+
+			var us = new UndoStack();
 
 
 			const frustumSize = 2;
@@ -370,7 +381,7 @@
 
 
 				update(){
-
+					
 					//this.position = new THREE.Vector3(this.x/100.,this.y/100.,this.L/50.-1);
 					this.position = xyLtopos(this.x,this.y,this.L);
 
@@ -381,6 +392,17 @@
 
 					this.rgb = FCLtoRGB(this.F,this.C,this.L);		
 
+					if(this.L<0 || this.L>100){
+					
+
+						this.L = Math.max(0,Math.min(99.999,this.L));
+						this.x = 0;
+						this.y = 0;
+						this.update();
+						return;
+					}
+
+					
 
 					if(this.rgb.clipped()){
 						if(lockChromaticity){
@@ -392,20 +414,14 @@
 								this.L = this.L + 0.005;
 							}
 
+							
+
 							this.update();
 							return;
 
 						}
 					}
 
-					if(this.L<0 || this.L>100){
-
-						this.L = Math.max(0,Math.min(99.999,this.L));
-						this.x = 0;
-						this.y = 0;
-						this.update();
-						return;
-					}
 
 					if(this.rgb.clipped()){
 
@@ -421,6 +437,7 @@
 							clipped = FCLtoRGB(this.F,tC,this.L).clipped();
 							
 						}
+
 
 						if(clipped)
 							tC = tC-step;
@@ -458,16 +475,19 @@
 				}
 
 				kill(){
-					this.onColourUpdatedListeners.forEach(lisner => lisner.kill());
+					
 				}
 			}
 
 
-			var draggableNodes = [];
+			var draggableNodesBoxes = [];
 
 			class DraggableNode extends Node{
 				constructor(L,x,y){
 					super(L,x,y);
+
+
+
 					this.size = 0.07;
 
 					this.boxGeometry = new THREE.BoxGeometry(this.size,this.size,this.size);
@@ -478,7 +498,7 @@
 					this.box.daddy = this;
 
 					scene.add(this.box);
-					draggableNodes.push(this.box);
+					draggableNodesBoxes.push(this.box);
 
 
 					this.inspectorDiv = nodeInspectorTemplate.content.cloneNode(true);
@@ -502,14 +522,26 @@
 				}
 
 				onClickDelete(){
-					
-					this.kill();
+					this.onColourUpdatedListeners.forEach(lisner => lisner.friendKilled());
+
+					var data = [...[this.L,this.x,this.y]];
+					var index = allNodes.indexOf(this);
+					us.execute( {
+							redo: function(){
+								allNodes.splice(index,1);
+								this.kill();
+							}.bind(this),
+							undo: function(){
+								allNodes.splice(index,0,new DraggableNode(data[0],data[1],data[2]));
+							},
+							message: `destroy node ${data}`
+						});
 				}
 
 				kill(){
 					super.kill();
 					scene.remove(this.box);
-					draggableNodes.splice(draggableNodes.indexOf(this.box),1);
+					draggableNodesBoxes.splice(draggableNodesBoxes.indexOf(this.box),1);
 					this.topDiv.remove();
 				}
 
@@ -565,6 +597,31 @@
 					this.Lincreased = this.L > oldL;
 					
 					this.update();
+				}
+
+				onBeginDrag(){
+					
+					this.storeState = [this.L,this.x,this.y];
+				}
+
+				onFinishDrag(){
+					
+					var storeFuture = [...[this.L,this.x,this.y]];
+					var storedState = [...this.storeState];
+
+					
+
+					us.record({
+						undo: (function(){
+							[this.L ,this.x, this.y] = storedState;
+							this.update();
+						}).bind(this) ,
+						redo: (function(){
+							[this.L,this.x,this.y] = storeFuture;
+							this.update();
+						}).bind(this),
+						message: ``
+					});
 				}
 			}
 
@@ -669,11 +726,33 @@
 
 				}
 
-				onClickDelete(){
-					
-					this.kill();
+				kill(){
+					this.topDiv.remove();
+					scene.remove(this.line);
 				}
 
+				onClickDelete(){
+					var index1 = allNodes.indexOf(this.n1);
+					var index2 = allNodes.indexOf(this.n2);
+					var index = allRamps.indexOf(this);
+
+					us.execute({
+						redo: function(){
+							allRamps.splice(index,1);
+							this.kill();
+						}.bind(this),
+						undo: function(){
+							createRamp(index1,index2);
+						},
+						message: `delete ramp between nodes ${index1}, ${index2}`
+					})
+
+
+				}
+
+				friendKilled(){
+					this.onClickDelete();
+				}
 
 				getxyLraw(t,tL){
 					var out = {};
@@ -789,10 +868,7 @@
 					
 				}
 
-				kill(){
-					this.topDiv.remove();
-					scene.remove(this.line);
-				}
+
 			}
 
 
@@ -989,37 +1065,79 @@
 			var gnode = new WhitePointNode(30,0,0);
 
 
+			var allNodes = [gnode];
+			var allRamps = [];
 
-			function randomNode(){
-				 return new DraggableNode(Math.random()*100,Math.random()*200-100,Math.random()*200-100);
+
+
+			//function randomNode(){
+			//	 return new DraggableNode(Math.random()*100,Math.random()*200-100,Math.random()*200-100);
+			//}
+
+			function randomLxy(){
+				return [Math.random()*100,Math.random()*200-100,Math.random()*200-100];
 			}
 
-			//for(var i =0;i<40; i++){
-			// 	var newnode = new Node(Math.random()*100,Math.random()*200-100,Math.random()*200-100);
-			// 	nodes.push(newnode.box);
-			// }
 
-			var test1 = randomNode();
-			var test2 = randomNode();
-			var ramp = new Ramp(test1,test2);
 
-			// for(var cn in rgbs){
-			// 	var c = rgbs[cn];
-			// 	var xyL = FCLtoxyL(RGBtoFCL(c.x,c.y,c.z));
+			function createDraggableNode(L,x,y){
 				
-			// 	var hmmm = new DraggableNode(xyL.L,xyL.x,xyL.y);
-			// }
+				var node = new DraggableNode(L,x,y);
+				allNodes.push(node);
+				return node;
+			}
+
+			function deleteLastNode(){
+				allNodes.pop().kill();
+			}
 
 			function addNewNode(){
-				var newnode = randomNode();
+				//var newnode = randomNode();
+				var Lxy = randomLxy();
+				var out = us.execute({
+					redo: function(){
+						return createDraggableNode(Lxy[0],Lxy[1],Lxy[2]);
+					},
+					undo: function(){
+						deleteLastNode();
+					},
+					message: `create node ${Lxy}`
+				});
+				return out;
+			}
 
+
+			var test1 = addNewNode();
+			var test2 = addNewNode();
+			//var ramp = new Ramp(test1,test2);
+
+			function createRamp(index0,index1){
+				var ramp = new Ramp(allNodes[index0],allNodes[index1]);
+				allRamps.push(ramp);
+				return ramp;
 			}
 
 			function addNewRamp(){
 				if(selectedNodes.length >= 2){
-					var ramp = new Ramp(selectedNodes[0],selectedNodes[1]);
+					//var ramp = new Ramp(selectedNodes[0],selectedNodes[1]);
+
+					var index0 = allNodes.indexOf(selectedNodes[0]);
+					var index1 = allNodes.indexOf(selectedNodes[1]);
+
+					var ramp = us.execute({
+						redo: function(){
+							return createRamp(index0,index1);
+						},
+						undo: function(){
+							allRamps.pop().kill();
+						},
+						message: `create ramp between colours ${index0} and ${index1}.`
+					})
+
 					clearSelection();
+					return ramp;
 				}
+				return null;
 			}
 
 
@@ -1076,7 +1194,7 @@
 				if(typeof dragControls != "undefined"){
 					dragControls.dispose();
 				}
-				dragControls = new THREE.DragControls( draggableNodes, camera, renderer.domElement);
+				dragControls = new THREE.DragControls( draggableNodesBoxes, camera, renderer.domElement);
 
 				dragControls.addEventListener( 'drag', function ( event ) {
 				 		event.object.daddy.updateFromPosition();
@@ -1084,10 +1202,12 @@
 
 				dragControls.addEventListener( 'dragstart', function ( event ) {
 						selectNode(event.object.daddy);
+						event.object.daddy.onBeginDrag();
 				 		orbitControls.enabled = false;
 				 	} );
 				dragControls.addEventListener( 'dragend', function ( event ) {
 						event.object.daddy.updateFromPosition();
+						event.object.daddy.onFinishDrag();
 				 		orbitControls.enabled = true;
 				 		hueLockDisplay.visible = false;
 				 	} );
@@ -1102,7 +1222,7 @@
                  if (event.key == "q") {
                      switchCameraMode();     
                  };
-                 if (event.key == "y") {
+                 if (event.key == "y" && !event.ctrlKey) {
                  	lockChromaticity = true;
                  };
                  if (event.key == "t"){
@@ -1117,6 +1237,13 @@
                  if (event.key == "w") {
                  	gamutCage.visible = !gamutCage.visible;
                  };
+
+                 if (event.key == "z" && event.ctrlKey){
+                 	us.undo();
+                 };
+                 if (event.key == "y" &&  event.ctrlKey){
+                 	us.redo();
+                 }
             };
             function onDocumentKeyUp(event) { 
                  if (event.key == "y") {
