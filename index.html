@@ -714,10 +714,11 @@
 					this.n1.onColourUpdatedListeners.push(this);
 					this.n2.onColourUpdatedListeners.push(this);
 
-					this.lambdaSlider.addEventListener("input",this.update.bind(this));
-					this.muSlider.addEventListener("input",this.update.bind(this));
-					//this.lambdaSlider.addEventListener("onchange",this.update.bind(this));
-
+					for(var slider of [this.lambdaSlider,this.muSlider]){
+						slider.addEventListener("input",this.onSliderDrag.bind(this));
+						slider.addEventListener("change",this.onSliderEndDrag.bind(this));
+					}
+					this.isDragging = false;
 
 					this.update();
 				
@@ -805,8 +806,8 @@
 
 
 				update() {
-					this.lambda = this.lambdaSlider.value;
-					this.mu = this.muSlider.value;
+					this.lambdaSlider.value = this.lambda;
+					this.muSlider.value = this.mu;
 					//this.maxblowup = Math.exp(-this.lambda);
 
 					this.midxyL = this.getxyLraw(0.5,0.5);
@@ -860,6 +861,43 @@
 
 
 					
+				}
+
+				onSliderDrag(){
+					if(!this.isDragging){
+						this.isDragging = true;
+						this.onSliderBeginDrag();
+					}
+					this.lambda = this.lambdaSlider.value;
+					this.mu = this.muSlider.value;
+					this.update();
+				}
+
+				onSliderBeginDrag(){
+					this.storeState = [this.lambda,this.mu];
+					
+				}
+
+				onSliderEndDrag(){
+					this.isDragging = false;
+
+					var storeFuture = [...[this.lambda,this.mu]];
+					var storedState = [...this.storeState];
+
+					
+
+					us.record({
+						undo: (function(){
+							[this.lambda,this.mu] = storedState;
+
+							this.update();
+						}).bind(this) ,
+						redo: (function(){
+							[this.lambda,this.mu] = storeFuture;
+							this.update();
+						}).bind(this),
+						message: ``
+					});
 				}
 
 				onColourUpdated(){
